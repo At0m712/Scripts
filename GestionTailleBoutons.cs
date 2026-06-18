@@ -1,25 +1,26 @@
 using UnityEngine;
 
+[RequireComponent(typeof(RectTransform))]
 public class GestionTailleBoutons : MonoBehaviour
 {
-    [Header("Les boutons (Glisser les RectTransform)")]
-    public RectTransform boutonClassique;
-    public RectTransform boutonSpeedrun;
+    private RectTransform rectTransform;
 
-    [Header("Taille du bouton sélectionné")]
-    public float tailleActive = 1.2f;
-
-    // Fonction à appeler quand on clique sur Classique
-    public void GrossirClassique()
+    private void Start()
     {
-        boutonClassique.localScale = new Vector3(tailleActive, tailleActive, 1f);
-        boutonSpeedrun.localScale = Vector3.one; // Remet l'autre à la taille 1
+        rectTransform = GetComponent<RectTransform>();
+        AdjustSizeForScreen();
     }
 
-    // Fonction à appeler quand on clique sur Speedrun
-    public void GrossirSpeedrun()
+    private void AdjustSizeForScreen()
     {
-        boutonSpeedrun.localScale = new Vector3(tailleActive, tailleActive, 1f);
-        boutonClassique.localScale = Vector3.one; // Remet l'autre à la taille 1
+        // Calcul du ratio de l'écran du joueur
+        float aspectRatio = (float)Screen.height / Screen.width;
+        
+        // Si l'écran est très allongé (ex: iPhone modernes, Samsung Galaxy S, ratio > 2.0)
+        // On réduit légèrement la taille de cet élément pour éviter qu'il ne s'écrase sur les bords
+        if (aspectRatio > 2f)
+        {
+            rectTransform.localScale = new Vector3(0.9f, 0.9f, 1f);
+        }
     }
 }

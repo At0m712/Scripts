@@ -1,39 +1,30 @@
 using UnityEngine;
-using UnityEngine.Localization.Settings;
-using System.Collections;
 
 public class GestionLangue : MonoBehaviour
 {
-    private bool estEnChangement = false;
+    public static GestionLangue Instance;
+    
+    [Header("Paramètres")]
+    public string currentLanguage = "FR"; // "FR" ou "EN"
 
-    // Cette fonction sera appelée par ton bouton unique
-    public void BasculerLangue()
+    private void Awake()
     {
-        if (estEnChangement) return;
-        StartCoroutine(BasculerLangueRoutine());
+        if (Instance == null) Instance = this;
+        else Destroy(gameObject);
+        
+        // Charge la langue sauvegardée ou utilise le français par défaut
+        currentLanguage = PlayerPrefs.GetString("Language", "FR");
     }
 
-    private IEnumerator BasculerLangueRoutine()
+    public void SwitchLanguage()
     {
-        estEnChangement = true;
-
-        // 1. On attend que le système de langue soit prêt (Très important, tu as bien fait !)
-        yield return LocalizationSettings.InitializationOperation;
-
-        // 2. On récupère la liste des langues et la langue actuellement affichée
-        var toutesLesLangues = LocalizationSettings.AvailableLocales.Locales;
-        var langueActuelle = LocalizationSettings.SelectedLocale;
-
-        // 3. On trouve où on en est dans la liste (0, 1, 2...)
-        int indexActuel = toutesLesLangues.IndexOf(langueActuelle);
-
-        // 4. On calcule la suivante de façon dynamique !
-        // Le modulo (%) permet de revenir à 0 quand on dépasse la fin de la liste.
-        int indexSuivant = (indexActuel + 1) % toutesLesLangues.Count;
-
-        // 5. On applique la nouvelle langue
-        LocalizationSettings.SelectedLocale = toutesLesLangues[indexSuivant];
-
-        estEnChangement = false;
+        currentLanguage = (currentLanguage == "FR") ? "EN" : "FR";
+        PlayerPrefs.SetString("Language", currentLanguage);
+        PlayerPrefs.Save();
+        
+        Debug.Log("[GestionLangue] Langue changée en : " + currentLanguage);
+        
+        // Dans une version finale, vous déclencherez ici un Action/Event 
+        // pour demander à tous les textes de l'UI de se recharger.
     }
 }
