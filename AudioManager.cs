@@ -2,23 +2,24 @@ using UnityEngine;
 
 public class AudioManager : MonoBehaviour
 {
-    // --- LE SINGLETON (Il survit partout) ---
-    public static AudioManager instance;
+    public static AudioManager Instance;
 
-    [Header("Les Haut-Parleurs")]
-    public AudioSource sourceMusique;
-    public AudioSource sourceEffets; // Pour les pièces, explosions, rebonds...
+    [Header("Sources Audio")]
+    public AudioSource musicSource;
+    public AudioSource sfxSource;
 
-    [Header("Volumes en cours")]
-    [Range(0f, 1f)] public float volumeMusique = 0.5f;
-    [Range(0f, 1f)] public float volumeEffets = 1f;
+    [Header("Clips Audio UI")]
+    public AudioClip clickSound;
+    public AudioClip buySound;
+    public AudioClip errorSound;
+    public AudioClip cashSound; // Pour les récompenses
 
-    void Awake()
+    private void Awake()
     {
-        if (instance == null)
+        if (Instance == null)
         {
-            instance = this;
-            DontDestroyOnLoad(gameObject); // Il ne sera jamais détruit !
+            Instance = this;
+            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -26,75 +27,23 @@ public class AudioManager : MonoBehaviour
         }
     }
 
-    void Start()
+    public void PlayClick()
     {
-        // On initialise les volumes au Start pour s'assurer que le SaveManager est bien prêt
-        InitialiserVolumes();
+        if (clickSound != null) sfxSource.PlayOneShot(clickSound);
     }
 
-    private void InitialiserVolumes()
+    public void PlayBuy()
     {
-        // On lit les valeurs sauvegardées
-        if (SaveManager.instance != null)
-        {
-            volumeMusique = SaveManager.instance.data.volumeMusique;
-            volumeEffets = SaveManager.instance.data.volumeEffets;
-        }
-
-        if (sourceMusique != null) sourceMusique.volume = volumeMusique;
-        if (sourceEffets != null) sourceEffets.volume = volumeEffets;
+        if (buySound != null) sfxSource.PlayOneShot(buySound);
     }
 
-    // --- FONCTIONS POUR LES SLIDERS (NOUVEAU) ---
-    public void ChangerVolumeMusique(float nouveauVolume)
+    public void PlayError()
     {
-        volumeMusique = nouveauVolume;
-        if (sourceMusique != null) sourceMusique.volume = volumeMusique;
-
-        // On sauvegarde en direct
-        if (SaveManager.instance != null)
-        {
-            SaveManager.instance.data.volumeMusique = volumeMusique;
-            SaveManager.instance.SauvegarderPartie();
-        }
+        if (errorSound != null) sfxSource.PlayOneShot(errorSound);
     }
 
-    public void ChangerVolumeEffets(float nouveauVolume)
+    public void PlayCash()
     {
-        volumeEffets = nouveauVolume;
-        if (sourceEffets != null) sourceEffets.volume = volumeEffets;
-
-        if (SaveManager.instance != null)
-        {
-            SaveManager.instance.data.volumeEffets = volumeEffets;
-            SaveManager.instance.SauvegarderPartie();
-        }
-    }
-
-    // --- FONCTIONS POUR LA MUSIQUE ---
-    public void JouerMusique(AudioClip musiqueClip)
-    {
-        if (musiqueClip == null || sourceMusique == null) return;
-
-        // Si c'est déjà la bonne musique qui tourne, on ne la recommence pas depuis le début
-        if (sourceMusique.clip == musiqueClip && sourceMusique.isPlaying) return;
-
-        sourceMusique.clip = musiqueClip;
-        sourceMusique.loop = true; // La musique tourne en boucle
-        sourceMusique.Play();
-    }
-
-    public void ArreterMusique()
-    {
-        if (sourceMusique != null) sourceMusique.Stop();
-    }
-
-    // --- FONCTIONS POUR LES BRUITAGES (SFX) ---
-    public void JouerSon(AudioClip sonClip, float volume = 1f)
-    {
-        if (sonClip == null || sourceEffets == null) return;
-        
-        // PlayOneShot multiplie le volume du clip par notre réglage global
-        sourceEffets.PlayOneShot(sonClip, volume * volumeEffets);
+        if (cashSound != null) sfxSource.PlayOneShot(cashSound);
     }
 }

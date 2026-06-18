@@ -3,63 +3,38 @@ using UnityEngine;
 
 public class ObjectPooler : MonoBehaviour
 {
-    // Singleton pour y accéder partout facilement
-    public static ObjectPooler instance;
+    public static ObjectPooler Instance;
 
-    [System.Serializable]
-    public class Pool
+    public GameObject objectToPool; // Le prefab à instancier (ex: Particule de clic)
+    public int amountToPool = 20;
+
+    private List<GameObject> pooledObjects;
+
+    private void Awake()
     {
-        public string tag; // Ex: "Piece" ou "Explosion"
-        public GameObject prefab;
-        public int tailleReserve; // Combien on en crée au démarrage (ex: 50)
+        if (Instance == null) Instance = this;
     }
 
-    public List<Pool> mesReserves;
-    public Dictionary<string, Queue<GameObject>> dictionnaireReserves;
-
-    void Awake()
+    private void Start()
     {
-        if (instance == null) instance = this;
-    }
-
-    void Start()
-    {
-        dictionnaireReserves = new Dictionary<string, Queue<GameObject>>();
-
-        // Au lancement, on fabrique tous les objets et on les cache
-        foreach (Pool reserve in mesReserves)
+        pooledObjects = new List<GameObject>();
+        for (int i = 0; i < amountToPool; i++)
         {
-            Queue<GameObject> fileDAttente = new Queue<GameObject>();
-
-            for (int i = 0; i < reserve.tailleReserve; i++)
-            {
-                GameObject obj = Instantiate(reserve.prefab);
-                obj.SetActive(false); // On le cache
-                obj.transform.SetParent(this.transform); // On range ça proprement
-                fileDAttente.Enqueue(obj);
-            }
-
-            dictionnaireReserves.Add(reserve.tag, fileDAttente);
+            GameObject obj = Instantiate(objectToPool, transform);
+            obj.SetActive(false);
+            pooledObjects.Add(obj);
         }
     }
 
-    // Fonction pour sortir un objet de la réserve
-    public GameObject SortirObjet(string tag, Vector3 position, Quaternion rotation, Transform parent = null)
+    public GameObject GetPooledObject()
     {
-        if (!dictionnaireReserves.ContainsKey(tag)) return null;
-
-        // On prend le premier objet de la file d'attente
-        GameObject objetASortir = dictionnaireReserves[tag].Dequeue();
-
-        // On le place et on l'allume
-        objetASortir.SetActive(true);
-        objetASortir.transform.position = position;
-        objetASortir.transform.rotation = rotation;
-        if (parent != null) objetASortir.transform.SetParent(parent);
-
-        // On le remet à la fin de la file d'attente pour plus tard
-        dictionnaireReserves[tag].Enqueue(objetASortir);
-
-        return objetASortir;
+        for (int i = 0; i < pooledObjects.Count; i++)
+        {
+            if (!pooledObjects[i].activeInHierarchy)
+            {
+                return pooledObjects[i];
+            }
+        }
+        return null; // Retourne null si tous les objets sont utilisés
     }
 }

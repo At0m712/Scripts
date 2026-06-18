@@ -2,31 +2,28 @@ using UnityEngine;
 
 public class AnimationFlottanteUI : MonoBehaviour
 {
-    [Header("Paramètres de Mouvement")]
-    [Tooltip("De combien de pixels la flèche monte et descend")]
-    public float amplitude = 5f; 
+    public float amplitude = 10f; // Hauteur du mouvement
+    public float speed = 2f;      // Vitesse du mouvement
     
-    [Tooltip("La vitesse du va-et-vient")]
-    public float vitesse = 4f;   
-
     private RectTransform rectTransform;
-    private Vector2 positionInitiale;
+    private Vector2 startPos;
 
-    void Start()
+    private void Start()
     {
         rectTransform = GetComponent<RectTransform>();
-        
-        // On mémorise la position d'origine du RectTransform
-        positionInitiale = rectTransform.anchoredPosition;
+        if (rectTransform != null)
+        {
+            startPos = rectTransform.anchoredPosition;
+        }
     }
 
-    void Update()
+    private void Update()
     {
-        // 1. On calcule l'oscillation grâce au sinus (ignore la pause du jeu avec unscaledTime)
-        float vagueSinus = Mathf.Sin(Time.unscaledTime * vitesse);
-
-        // 2. On applique le mouvement de haut en bas par rapport à la position de départ
-        float decalageY = vagueSinus * amplitude;
-        rectTransform.anchoredPosition = new Vector2(positionInitiale.x, positionInitiale.y + decalageY);
+        if (rectTransform != null)
+        {
+            // Utilise un Sinus mathématique pour un mouvement fluide sans aucun lien avec un autre script
+            float newY = startPos.y + Mathf.Sin(Time.time * speed) * amplitude;
+            rectTransform.anchoredPosition = new Vector2(rectTransform.anchoredPosition.x, newY);
+        }
     }
 }
