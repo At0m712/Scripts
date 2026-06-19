@@ -63,9 +63,21 @@ public class SaveManager : MonoBehaviour
 
     public void CollectOfflineGainsAdBoost()
     {
-        // TODO: Appeler l'API de pub ici. Si succès :
-        GameManager.Instance.AddMana(pendingOfflineGains * 2); // Pub = x2
-        offlinePopup.GetComponent<PopupAnimator>().Fermer();
+        // APPEL PUB COMPLÉTÉ
+        if (AdMobManager.Instance != null)
+        {
+            AdMobManager.Instance.ShowRewardedAd(() => 
+            {
+                GameManager.Instance.AddMana(pendingOfflineGains * 2);
+                offlinePopup.GetComponent<PopupAnimator>().Fermer();
+            });
+        }
+        else
+        {
+            // Sécurité de test (si AdMobManager n'est pas encore dans la scène)
+            GameManager.Instance.AddMana(pendingOfflineGains * 2); 
+            offlinePopup.GetComponent<PopupAnimator>().Fermer();
+        }
     }
 
     void OnApplicationQuit() { SaveGame(); }

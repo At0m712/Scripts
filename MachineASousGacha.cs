@@ -51,8 +51,18 @@ public class MachineASousGacha : MonoBehaviour
         }
         else
         {
-            // TODO: Appeler ton AdMobManager ici. Si la pub est vue en entier :
-            ExecuteSpin(); 
+            // APPEL PUB COMPLÉTÉ
+            if (AdMobManager.Instance != null)
+            {
+                AdMobManager.Instance.ShowRewardedAd(() => 
+                {
+                    ExecuteSpin();
+                });
+            }
+            else 
+            {
+                ExecuteSpin(); // Sécurité de test
+            }
         }
     }
 

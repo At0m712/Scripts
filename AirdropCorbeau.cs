@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro; // 1. AJOUT OBLIGATOIRE pour utiliser TextMeshProUGUI
 
 public class AirdropCorbeau : MonoBehaviour
 {
@@ -9,11 +10,22 @@ public class AirdropCorbeau : MonoBehaviour
     private float timer = 0f;
     private bool isActive = false;
     private RectTransform rectTransform;
+    
+    // 2. Ajout de ces variables pour masquer l'oiseau plutôt que de le désactiver
+    private Image corbeauImage;
+    private Button corbeauButton;
+
+    [Header("Effets Visuels")]
+    public ParticleSystem explosionPlumes;
 
     void Start()
     {
         rectTransform = GetComponent<RectTransform>();
-        GetComponent<Button>().onClick.AddListener(OnClickCorbeau);
+        corbeauImage = GetComponent<Image>();
+        corbeauButton = GetComponent<Button>();
+        
+        corbeauButton.onClick.AddListener(OnClickCorbeau);
+        
         ResetCorbeau();
     }
 
@@ -21,6 +33,7 @@ public class AirdropCorbeau : MonoBehaviour
     {
         if (!isActive)
         {
+            // Le timer peut maintenant tourner car le GameObject reste actif !
             timer += Time.deltaTime;
             if (timer >= respawnTime) SpawnCorbeau();
         }
@@ -39,16 +52,22 @@ public class AirdropCorbeau : MonoBehaviour
         isActive = true;
         timer = 0f;
         
+        // 3. On rend l'image visible et le bouton cliquable
+        corbeauImage.enabled = true;
+        corbeauButton.interactable = true;
+
         // Fait spawn le corbeau à gauche, à une hauteur aléatoire
         float randomY = UnityEngine.Random.Range(-500f, 500f);
         rectTransform.anchoredPosition = new Vector2(-600f, randomY);
-        gameObject.SetActive(true);
     }
 
     private void ResetCorbeau()
     {
         isActive = false;
-        gameObject.SetActive(false);
+        
+        // 4. On masque l'image et on bloque les clics (le script continue de tourner en fond)
+        corbeauImage.enabled = false;
+        corbeauButton.interactable = false;
     }
 
     public void OnClickCorbeau()
@@ -57,7 +76,29 @@ public class AirdropCorbeau : MonoBehaviour
         double reward = GameManager.Instance.manaPerSecond * 900;
         GameManager.Instance.AddMana(reward);
         
-        // TODO: Jouer particule explosion de plumes
+        // EFFET VISUEL
+        if (explosionPlumes != null)
+        {
+            // Assure-toi que les particules ne sont pas "Enfant" direct du corbeau, 
+            // sinon elles bougeront avec lui. Le mieux est de les laisser au centre de l'écran.
+            explosionPlumes.transform.position = transform.position;
+            explosionPlumes.Play();
+        }
+
+        if (ObjectPooler.Instance != null)
+        {
+            GameObject popup = ObjectPooler.Instance.SpawnFromPool(transform.position);
+            if (popup != null)
+            {
+                TextMeshProUGUI textComp = popup.GetComponentInChildren<TextMeshProUGUI>();
+                if (textComp != null)
+                {
+                    textComp.text = "+ " + ScoreUI.FormatNumber(reward);
+                    textComp.color = Color.yellow;
+                }
+            }
+        }
+
         ResetCorbeau();
     }
 }

@@ -2,16 +2,16 @@ using UnityEngine;
 
 public class LiensLegaux : MonoBehaviour
 {
-    private string urlPrivacyPolicy = "https://votre-site.com/privacy-policy";
-    private string urlTerms = "https://votre-site.com/terms";
+    public string urlCGU = "https://votre-site.com/cgu";
+    public string urlConfidentialite = "https://votre-site.com/privacy";
 
-    public void OpenPrivacyPolicy()
+    public void OuvrirConditions()
     {
-        Application.OpenURL(urlPrivacyPolicy);
+        Application.OpenURL(urlCGU);
     }
 
-    public void OpenTermsOfService()
+    public void OuvrirPolitique()
     {
-        Application.OpenURL(urlTerms);
+        Application.OpenURL(urlConfidentialite);
     }
 }

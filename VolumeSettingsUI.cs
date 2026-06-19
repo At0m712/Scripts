@@ -6,20 +6,22 @@ public class VolumeSettingsUI : MonoBehaviour
     public Slider musicSlider;
     public Slider sfxSlider;
 
-    private void Start()
+    void Start()
     {
-        // Charger les préférences sauvegardées
-        if (musicSlider != null)
-        {
-            musicSlider.value = PlayerPrefs.GetFloat("MusicVolume", 1f);
-            musicSlider.onValueChanged.AddListener(SetMusicVolume);
-        }
+        // Charge les préférences du joueur (ou met à 100% par défaut)
+        float savedMusicVol = PlayerPrefs.GetFloat("MusicVolume", 1f);
+        float savedSFXVol = PlayerPrefs.GetFloat("SFXVolume", 1f);
 
-        if (sfxSlider != null)
-        {
-            sfxSlider.value = PlayerPrefs.GetFloat("SFXVolume", 1f);
-            sfxSlider.onValueChanged.AddListener(SetSFXVolume);
-        }
+        musicSlider.value = savedMusicVol;
+        sfxSlider.value = savedSFXVol;
+
+        // Met à jour l'audio au démarrage
+        SetMusicVolume(savedMusicVol);
+        SetSFXVolume(savedSFXVol);
+
+        // Ajoute des "écouteurs" pour réagir quand le joueur bouge le curseur
+        musicSlider.onValueChanged.AddListener(SetMusicVolume);
+        sfxSlider.onValueChanged.AddListener(SetSFXVolume);
     }
 
     public void SetMusicVolume(float volume)

@@ -9,12 +9,16 @@ public class GameManager : MonoBehaviour
     public double manaTotalProduced = 0;
     public double manaPerSecond = 0;
     public int temporalCrystals = 0;
-
+    
     [Header("Multiplicateurs")]
     public float globalMultiplier = 1f;
     public float adBoostMultiplier = 1f;
     public float adBoostTimer = 0f;
-    public float costReductionBonus = 0f; // Réduction venant de l'arbre
+    public float costReductionBonus = 0f; 
+
+    [Header("Surcharge (Rush)")]
+    public float rushTimer = 0f;
+    public float rushMultiplier = 10f;
 
     void Awake()
     {
@@ -24,7 +28,7 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // Gestion du boost publicitaire
+        // 1. Gestion du boost publicitaire cumulatif (Max 24h = 86400 secondes)
         if (adBoostTimer > 0)
         {
             adBoostTimer -= Time.deltaTime;
@@ -32,13 +36,35 @@ public class GameManager : MonoBehaviour
         }
         else
         {
+            adBoostTimer = 0;
             adBoostMultiplier = 1f;
         }
 
-        // Production de mana
-        double gain = (manaPerSecond * globalMultiplier * adBoostMultiplier) * Time.deltaTime;
+        // 2. Gestion de la Surcharge (Rush)
+        float currentRush = 1f;
+        if (rushTimer > 0)
+        {
+            rushTimer -= Time.deltaTime;
+            currentRush = rushMultiplier;
+        }
+
+        // 3. Calcul de la production
+        double gain = (manaPerSecond * globalMultiplier * adBoostMultiplier * currentRush) * Time.deltaTime;
         manaCurrent += gain;
         manaTotalProduced += gain;
+    }
+
+    // Fonction à appeler depuis un nouveau bouton "Sort de Surcharge"
+    public void ActivateRush()
+    {
+        rushTimer = 10f; // Active le boost x10 pendant 10 secondes
+    }
+
+    // Fonction pour ajouter du temps de boost (ex: +4 heures par pub)
+    public void AddAdBoostTime(float secondsToAdd)
+    {
+        adBoostTimer += secondsToAdd;
+        if (adBoostTimer > 86400f) adBoostTimer = 86400f; // Plafond à 24h
     }
 
     public void AddMana(double amount)

@@ -7,6 +7,8 @@ public class MultiplicateurUI : MonoBehaviour
 {
     public TextMeshProUGUI rewardText;
     private int crystalsToGet = 0;
+    [Header("Effets Visuels")]
+    public ParticleSystem prestigeParticles;
 
     void OnEnable()
     {
@@ -30,9 +32,20 @@ public class MultiplicateurUI : MonoBehaviour
         // On nettoie la progression de la tour
         PlayerPrefs.DeleteKey("manaCurrent");
         PlayerPrefs.DeleteKey("manaTotalProduced");
-        // Attention : il faut aussi effacer les clés "Tour_..." ici ou via un script dédié.
+        // Optionnel : PlayerPrefs.DeleteAll() si on veut TOUT reset sauf les cristaux.
 
-        // Redémarre le jeu à zéro
+        // EFFET VISUEL COMPLÉTÉ
+        if (prestigeParticles != null)
+        {
+            prestigeParticles.Play();
+        }
+
+        // On attend 1.5 secondes pour laisser l'explosion se jouer, puis on recharge
+        Invoke("ReloadScene", 1.5f);
+    }
+
+    private void ReloadScene()
+    {
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

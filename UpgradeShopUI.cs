@@ -5,21 +5,25 @@ using System;
 
 public class UpgradeShopUI : MonoBehaviour
 {
-    public string floorName;
+    [Header("Données de l'étage")]
+    public FloorData myFloorData; // Glisse ton fichier "Donnees Etage" ici !
+    
     public int currentLevel = 0;
-    public double baseCost = 10;
-    public float baseCostMultiplier = 1.15f;
-    public double baseProduction = 1;
-
     public TextMeshProUGUI nameText;
     public TextMeshProUGUI levelText;
     public TextMeshProUGUI costText;
     public TextMeshProUGUI productionText;
     public Button upgradeButton;
+    public Image floorIconUI; // L'image de l'étage
+    private double lastAddedProduction = 0;
 
     void Start()
     {
-        currentLevel = PlayerPrefs.GetInt("Tour_" + floorName, 0);
+        // Utilisation des données du ScriptableObject
+        currentLevel = PlayerPrefs.GetInt("Tour_" + myFloorData.floorName, 0);
+        
+        if (floorIconUI != null) floorIconUI.sprite = myFloorData.iconEtage;
+        
         UpdateGameManagerProduction();
         UpdateUI();
     }
@@ -30,45 +34,77 @@ public class UpgradeShopUI : MonoBehaviour
         upgradeButton.interactable = (GameManager.Instance.manaCurrent >= GetCurrentCost());
     }
 
+    private double GetCurrentCost()
+    {
+        float actualMultiplier = Mathf.Max(1.05f, myFloorData.baseCostMultiplier - GameManager.Instance.costReductionBonus);
+        return myFloorData.baseCost * System.Math.Pow(actualMultiplier, currentLevel);
+    }
+
+    private double GetCurrentProduction()
+    {
+        if (currentLevel == 0) return 0;
+        double palierBonus = System.Math.Pow(2, currentLevel / 25);
+        return myFloorData.baseProduction * currentLevel * palierBonus;
+    }
+
+    private void UpdateUI()
+    {
+        nameText.text = myFloorData.floorName;
+        levelText.text = "Lvl " + currentLevel;
+        costText.text = ScoreUI.FormatNumber(GetCurrentCost());
+        productionText.text = "+ " + ScoreUI.FormatNumber(GetCurrentProduction() + myFloorData.baseProduction) + "/s";
+    }
+
     public void BuyUpgrade()
     {
         double cost = GetCurrentCost();
         if (GameManager.Instance.SpendMana(cost))
         {
             currentLevel++;
-            PlayerPrefs.SetInt("Tour_" + floorName, currentLevel);
+            
+            // CORRECTION ICI : Utilisation de myFloorData.floorName
+            PlayerPrefs.SetInt("Tour_" + myFloorData.floorName, currentLevel); 
+            
             UpdateGameManagerProduction();
             UpdateUI();
             
-            // TODO: Jouer le son d'achat et la particule ici
+            // JUS VISUEL ET SONORE COMPLÉTÉ
+            if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+            {
+                AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+            }
+
+            if (ObjectPooler.Instance != null)
+            {
+                // Fait spawn un texte flottant à la position du bouton
+                GameObject popup = ObjectPooler.Instance.SpawnFromPool(upgradeButton.transform.position);
+                if (popup != null)
+                {
+                    TextMeshProUGUI textComp = popup.GetComponentInChildren<TextMeshProUGUI>();
+                    if (textComp != null)
+                    {
+                        textComp.text = "- " + ScoreUI.FormatNumber(cost);
+                        textComp.color = Color.red; // Texte en rouge pour une dépense
+                    }
+                }
+            }
         }
-    }
-
-    private double GetCurrentCost()
-    {
-        float actualMultiplier = Mathf.Max(1.05f, baseCostMultiplier - GameManager.Instance.costReductionBonus);
-        return baseCost * Math.Pow(actualMultiplier, currentLevel);
-    }
-
-    private double GetCurrentProduction()
-    {
-        if (currentLevel == 0) return 0;
-        // x2 tous les 25 niveaux
-        double palierBonus = Math.Pow(2, currentLevel / 25);
-        return baseProduction * currentLevel * palierBonus;
-    }
-
-    private void UpdateUI()
-    {
-        nameText.text = floorName;
-        levelText.text = "Lvl " + currentLevel;
-        costText.text = ScoreUI.FormatNumber(GetCurrentCost());
-        productionText.text = "+ " + ScoreUI.FormatNumber(GetCurrentProduction() + baseProduction) + "/s"; // Affiche la prochaine prod
     }
 
     private void UpdateGameManagerProduction()
     {
-        // Cette fonction recalculera la production totale de la tour. 
-        // Dans une version complète, le GameManager boucle sur tous les étages.
+        if (GameManager.Instance == null) return;
+
+        // 1. Calcule la production totale de cet étage précis
+        double newProduction = GetCurrentProduction();
+
+        // 2. Calcule la différence avec l'ancienne production
+        double difference = newProduction - lastAddedProduction;
+
+        // 3. Ajoute uniquement cette différence au gain par seconde global
+        GameManager.Instance.manaPerSecond += difference;
+
+        // 4. Met à jour la mémoire de l'étage
+        lastAddedProduction = newProduction;
     }
 }
