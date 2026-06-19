@@ -1,6 +1,5 @@
 using UnityEngine;
 using TMPro;
-using System;
 
 public class ScoreUI : MonoBehaviour
 {
@@ -8,28 +7,31 @@ public class ScoreUI : MonoBehaviour
     public TextMeshProUGUI crystalsText;
     public TextMeshProUGUI manaPerSecText;
 
-    void Update()
+    private readonly string[] suffixes = { "", " K", " M", " B", " T", " AA", " AB", " AC", " AD", " AE", " AF" };
+
+    private void Update()
     {
         if (GameManager.Instance == null) return;
 
-        manaText.text = FormatNumber(GameManager.Instance.manaCurrent);
-        crystalsText.text = GameManager.Instance.temporalCrystals.ToString();
+        manaText.text = FormatNumber(GameManager.Instance.manaCurrent) + " Mana";
+        crystalsText.text = FormatNumber(GameManager.Instance.temporalCrystals);
         
-        double actualProd = GameManager.Instance.manaPerSecond * GameManager.Instance.globalMultiplier * GameManager.Instance.adBoostMultiplier;
-        manaPerSecText.text = "+ " + FormatNumber(actualProd) + " / sec";
+        float totalMult = GameManager.Instance.globalMultiplier + (float)(GameManager.Instance.temporalCrystals * 0.02f);
+        manaPerSecText.text = "+" + FormatNumber(GameManager.Instance.manaPerSecond * totalMult) + "/sec";
     }
 
-    // Le fameux formateur de nombres
-    public static string FormatNumber(double value)
+    // Fonction mathématique pour formater les grands nombres (ex: 1500000 -> 1.50 M)
+    public string FormatNumber(double value)
     {
-        if (value < 1000) return Math.Floor(value).ToString();
+        if (value < 1000d) return value.ToString("0");
 
-        string[] suffixes = { "", "K", "M", "B", "T", "AA", "AB", "AC", "AD", "AE" };
-        int suffixIndex = (int)Math.Floor(Math.Log10(value) / 3);
-        
-        if (suffixIndex >= suffixes.Length) suffixIndex = suffixes.Length - 1;
+        int suffixIndex = 0;
+        while (value >= 1000d && suffixIndex < suffixes.Length - 1)
+        {
+            value /= 1000d;
+            suffixIndex++;
+        }
 
-        double displayValue = value / Math.Pow(10, suffixIndex * 3);
-        return displayValue.ToString("F2") + " " + suffixes[suffixIndex];
+        return value.ToString("0.00") + suffixes[suffixIndex];
     }
 }

@@ -7,37 +7,37 @@ public class ClicManuel : MonoBehaviour, IPointerDownHandler
     [Header("Paramètres de clic")]
     public double baseClickPower = 1;
 
+    // Cette fonction détecte le contact exact sur l'écran (mobile & PC)
     public void OnPointerDown(PointerEventData eventData)
     {
-        // 1. Calcul du gain
+        if (GameManager.Instance == null) return;
+
+        // 1. Calcul de la puissance du clic
         double gain = baseClickPower * GameManager.Instance.globalMultiplier;
-        
-        // 2. Ajout au GameManager
         GameManager.Instance.AddMana(gain);
 
-        // 3. Effet Sonore
+        // 2. Audio (Avec pitch aléatoire pour plus de dynamisme)
         if (AudioManager.Instance != null && AudioManager.Instance.clickSound != null)
         {
-            AudioManager.Instance.sfxSource.pitch = Random.Range(0.95f, 1.05f);
+            AudioManager.Instance.sfxSource.pitch = Random.Range(0.9f, 1.1f);
             AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.clickSound);
         }
 
-        // 4. Effet Visuel (Le texte flottant +X)
+        // 3. Feedback Visuel (Pool d'objets)
         if (ObjectPooler.Instance != null)
         {
-            Vector3 randomOffset = new Vector3(Random.Range(-50f, 50f), Random.Range(-50f, 50f), 0);
+            // Décalage léger pour éviter que les textes s'empilent
+            Vector3 randomOffset = new Vector3(Random.Range(-40f, 40f), Random.Range(-40f, 40f), 0);
+            Vector3 spawnPos = new Vector3(eventData.position.x, eventData.position.y, 0) + randomOffset; 
             
-            // CORRECTION : On utilise eventData.position au lieu de l'ancien Input.mousePosition
-            Vector3 spawnPosition = new Vector3(eventData.position.x, eventData.position.y, 0) + randomOffset; 
-            
-            GameObject popup = ObjectPooler.Instance.SpawnFromPool(spawnPosition);
-            if (popup != null)
+            GameObject popupText = ObjectPooler.Instance.SpawnFromPool(spawnPos);
+            if (popupText != null)
             {
-                TextMeshProUGUI textComp = popup.GetComponentInChildren<TextMeshProUGUI>();
+                TextMeshProUGUI textComp = popupText.GetComponentInChildren<TextMeshProUGUI>();
                 if (textComp != null)
                 {
-                    textComp.text = "+ " + ScoreUI.FormatNumber(gain);
-                    textComp.color = new Color(0.2f, 0.8f, 1f); 
+                    textComp.text = "+ " + Math.Floor(gain).ToString();
+                    textComp.color = new Color(0.2f, 0.8f, 1f); // Bleu cyan magique
                 }
             }
         }

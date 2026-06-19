@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 
 public class GameManager : MonoBehaviour
 {
@@ -9,88 +10,64 @@ public class GameManager : MonoBehaviour
     public double manaTotalProduced = 0;
     public double manaPerSecond = 0;
     public int temporalCrystals = 0;
-    
+
     [Header("Multiplicateurs")]
-    public float globalMultiplier = 1f;
-    public float adBoostMultiplier = 1f;
+    public float globalMultiplier = 1f; // Lié à l'arbre de compétences
+    public float adBoostMultiplier = 1f; // Pub (x2)
     public float adBoostTimer = 0f;
-    public float costReductionBonus = 0f; 
+    public float costReductionBonus = 0f;
 
     [Header("Surcharge (Rush)")]
-    public float rushTimer = 0f;
     public float rushMultiplier = 10f;
+    private float rushTimer = 0f;
+    public bool IsRushActive => rushTimer > 0;
 
     void Awake()
     {
+        // Pattern Singleton sécurisé
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
     }
 
     void Update()
     {
-        // 1. Gestion du boost publicitaire cumulatif (Max 24h = 86400 secondes)
-        if (adBoostTimer > 0)
-        {
-            adBoostTimer -= Time.deltaTime;
-            adBoostMultiplier = 2f;
-        }
-        else
-        {
-            adBoostTimer = 0;
-            adBoostMultiplier = 1f;
-        }
-
-        // 2. Gestion de la Surcharge (Rush)
-        float currentRush = 1f;
+        // 1. Gestion du Timer de Surcharge
         if (rushTimer > 0)
         {
             rushTimer -= Time.deltaTime;
-            currentRush = rushMultiplier;
         }
 
-        // 3. Calcul de la production
-        double gain = (manaPerSecond * globalMultiplier * adBoostMultiplier * currentRush) * Time.deltaTime;
-        manaCurrent += gain;
-        manaTotalProduced += gain;
-    }
+        // 2. Calcul du gain par seconde (optimisé avec Time.deltaTime)
+        if (manaPerSecond > 0)
+        {
+            double currentMulti = globalMultiplier * adBoostMultiplier;
+            if (IsRushActive) currentMulti *= rushMultiplier;
 
-    // Fonction à appeler depuis un nouveau bouton "Sort de Surcharge"
-    public void ActivateRush()
-    {
-        rushTimer = 10f; // Active le boost x10 pendant 10 secondes
-    }
-
-    // Fonction pour ajouter du temps de boost (ex: +4 heures par pub)
-    public void AddAdBoostTime(float secondsToAdd)
-    {
-        adBoostTimer += secondsToAdd;
-        if (adBoostTimer > 86400f) adBoostTimer = 86400f; // Plafond à 24h
+            double manaToGive = (manaPerSecond * currentMulti) * Time.deltaTime;
+            AddMana(manaToGive);
+        }
     }
 
     public void AddMana(double amount)
     {
+        if (double.IsNaN(amount) || amount <= 0) return; // Sécurité anti-bug
         manaCurrent += amount;
         manaTotalProduced += amount;
     }
 
+    // FONCTION CRUCIALE POUR LES ACHATS
     public bool SpendMana(double amount)
     {
-        if (manaCurrent >= amount)
+        if (manaCurrent >= amount && amount > 0)
         {
             manaCurrent -= amount;
-            return true; // Achat réussi
+            return true; // Achat autorisé
         }
-        return false; // Pas assez d'argent
+        return false; // Fonds insuffisants
     }
 
-    public void RecalculateMultiplier()
+    public void ActivateRush(float durationInSeconds)
     {
-        // Exemple : +50% par niveau d'amélioration de l'Arbre
-        int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
-        globalMultiplier = 1f + (prodBonusLevel * 0.5f);
-        
-        // Réduction du coût (-1% par niveau)
-        int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
-        costReductionBonus = costReducLevel * 0.01f;
+        rushTimer = durationInSeconds;
     }
 }
