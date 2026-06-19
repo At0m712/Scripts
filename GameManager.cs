@@ -78,9 +78,9 @@ public class GameManager : MonoBehaviour
         if (manaCurrent >= amount)
         {
             manaCurrent -= amount;
-            return true;
+            return true; // Achat réussi
         }
-        return false;
+        return false; // Pas assez d'argent
     }
 
     public void RecalculateMultiplier()

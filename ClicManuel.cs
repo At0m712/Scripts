@@ -2,13 +2,11 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using TMPro;
 
-// IPointerDownHandler permet de détecter n'importe quel toucher sur l'écran
 public class ClicManuel : MonoBehaviour, IPointerDownHandler
 {
     [Header("Paramètres de clic")]
     public double baseClickPower = 1;
 
-    // Cette fonction se déclenche toute seule dès que le doigt touche l'objet
     public void OnPointerDown(PointerEventData eventData)
     {
         // 1. Calcul du gain
@@ -24,11 +22,13 @@ public class ClicManuel : MonoBehaviour, IPointerDownHandler
             AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.clickSound);
         }
 
-        // 4. Effet Visuel (Le texte flottant +1)
+        // 4. Effet Visuel (Le texte flottant +X)
         if (ObjectPooler.Instance != null)
         {
             Vector3 randomOffset = new Vector3(Random.Range(-50f, 50f), Random.Range(-50f, 50f), 0);
-            Vector3 spawnPosition = Input.mousePosition + randomOffset; 
+            
+            // CORRECTION : On utilise eventData.position au lieu de l'ancien Input.mousePosition
+            Vector3 spawnPosition = new Vector3(eventData.position.x, eventData.position.y, 0) + randomOffset; 
             
             GameObject popup = ObjectPooler.Instance.SpawnFromPool(spawnPosition);
             if (popup != null)
