@@ -1,58 +1,38 @@
 using UnityEngine;
 using TMPro;
-using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+using System;
 
 public class MultiplicateurUI : MonoBehaviour
 {
-    public GameObject prestigePanel;
-    public Button prestigeButton;
     public TextMeshProUGUI rewardText;
+    private int crystalsToGet = 0;
 
-    private double pendingCrystals = 0;
-
-    private void Update()
+    void OnEnable()
     {
-        // Déblocage uniquement si le mana total généré dans la partie dépasse 1 Trillion (1 000 000 000 000)
-        if (GameManager.Instance.manaTotalProduced >= 1000000000000d)
-        {
-            prestigeButton.interactable = true;
-            CalculatePendingCrystals();
-        }
-        else
-        {
-            prestigeButton.interactable = false;
-        }
-    }
+        if (GameManager.Instance == null) return;
 
-    private void CalculatePendingCrystals()
-    {
-        // Formule du GDD : Racine Cubique du (Mana Total / 1 Milliard)
-        double baseValue = GameManager.Instance.manaTotalProduced / 1000000000d;
-        pendingCrystals = System.Math.Pow(baseValue, 1f / 3f);
-        
-        ScoreUI scoreUI = FindObjectOfType<ScoreUI>();
-        rewardText.text = "Détruire la tour pour gagner\n" + scoreUI.FormatNumber(pendingCrystals) + " Cristaux";
+        // Racine cubique de (Mana Total / 1 Million)
+        double rawCrystals = Math.Pow(GameManager.Instance.manaTotalProduced / 1000000.0, 1.0 / 3.0);
+        crystalsToGet = (int)Math.Floor(rawCrystals);
+
+        rewardText.text = "+ " + crystalsToGet + " Cristaux";
     }
 
     public void TriggerPrestige()
     {
-        // Ajout des cristaux
-        GameManager.Instance.temporalCrystals += System.Math.Floor(pendingCrystals);
+        if (crystalsToGet <= 0) return;
 
-        // Reset des valeurs monétaires
-        GameManager.Instance.manaCurrent = 0;
-        GameManager.Instance.manaTotalProduced = 0;
-        GameManager.Instance.manaPerSecond = 0;
+        // On sauvegarde l'argent premium et les arbres
+        int totalCrystals = GameManager.Instance.temporalCrystals + crystalsToGet;
+        PlayerPrefs.SetInt("temporalCrystals", totalCrystals);
 
-        // Reset des étages : Détruit et recrée ou remet à niveau 0
-        UpgradeShopUI[] allFloors = FindObjectsOfType<UpgradeShopUI>();
-        foreach (var floor in allFloors)
-        {
-            floor.currentLevel = 0;
-            // La logique complète nécessiterait de re-vérrouiller les étages 2 à 10
-        }
+        // On nettoie la progression de la tour
+        PlayerPrefs.DeleteKey("manaCurrent");
+        PlayerPrefs.DeleteKey("manaTotalProduced");
+        // Attention : il faut aussi effacer les clés "Tour_..." ici ou via un script dédié.
 
-        FindObjectOfType<SaveManager>().SaveGame();
-        prestigePanel.SetActive(false);
+        // Redémarre le jeu à zéro
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

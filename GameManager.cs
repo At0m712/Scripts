@@ -1,49 +1,44 @@
 using UnityEngine;
-using System.Collections.Generic;
 
 public class GameManager : MonoBehaviour
 {
     public static GameManager Instance;
 
-    [Header("Économie")]
+    [Header("Ressources")]
     public double manaCurrent = 0;
     public double manaTotalProduced = 0;
     public double manaPerSecond = 0;
-    
-    [Header("Prestige")]
-    public double temporalCrystals = 0;
-    public float globalMultiplier = 1f;
+    public int temporalCrystals = 0;
 
-    [Header("Boosts Pubs")]
+    [Header("Multiplicateurs")]
+    public float globalMultiplier = 1f;
     public float adBoostMultiplier = 1f;
     public float adBoostTimer = 0f;
+    public float costReductionBonus = 0f; // Réduction venant de l'arbre
 
-    private void Awake()
+    void Awake()
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
     }
 
-    private void Update()
+    void Update()
     {
-        // Calcul du multiplicateur total (Base * Prestige * Pubs)
-        float totalMultiplier = globalMultiplier * adBoostMultiplier;
-        
-        // Bonus des Cristaux Temporels (+2% par cristal)
-        totalMultiplier += (float)(temporalCrystals * 0.02f); 
-
-        // Ajout du mana chaque frame proportionnellement au temps écoulé
-        double generatedThisFrame = (manaPerSecond * totalMultiplier) * Time.deltaTime;
-        
-        manaCurrent += generatedThisFrame;
-        manaTotalProduced += generatedThisFrame;
-
-        // Gestion du timer de publicité
+        // Gestion du boost publicitaire
         if (adBoostTimer > 0)
         {
             adBoostTimer -= Time.deltaTime;
-            if (adBoostTimer <= 0) adBoostMultiplier = 1f; // Fin du boost
+            adBoostMultiplier = 2f;
         }
+        else
+        {
+            adBoostMultiplier = 1f;
+        }
+
+        // Production de mana
+        double gain = (manaPerSecond * globalMultiplier * adBoostMultiplier) * Time.deltaTime;
+        manaCurrent += gain;
+        manaTotalProduced += gain;
     }
 
     public void AddMana(double amount)
@@ -60,5 +55,16 @@ public class GameManager : MonoBehaviour
             return true;
         }
         return false;
+    }
+
+    public void RecalculateMultiplier()
+    {
+        // Exemple : +50% par niveau d'amélioration de l'Arbre
+        int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
+        globalMultiplier = 1f + (prodBonusLevel * 0.5f);
+        
+        // Réduction du coût (-1% par niveau)
+        int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
+        costReductionBonus = costReducLevel * 0.01f;
     }
 }

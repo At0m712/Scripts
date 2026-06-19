@@ -4,18 +4,13 @@ using UnityEngine;
 public class ObjectPooler : MonoBehaviour
 {
     public static ObjectPooler Instance;
-
-    public GameObject objectToPool; // Le prefab à instancier (ex: Particule de clic)
+    public GameObject objectToPool; // Ton prefab de texte volant
     public int amountToPool = 20;
-
     private List<GameObject> pooledObjects;
 
-    private void Awake()
-    {
-        if (Instance == null) Instance = this;
-    }
+    void Awake() { Instance = this; }
 
-    private void Start()
+    void Start()
     {
         pooledObjects = new List<GameObject>();
         for (int i = 0; i < amountToPool; i++)
@@ -26,15 +21,17 @@ public class ObjectPooler : MonoBehaviour
         }
     }
 
-    public GameObject GetPooledObject()
+    public GameObject SpawnFromPool(Vector3 position)
     {
         for (int i = 0; i < pooledObjects.Count; i++)
         {
             if (!pooledObjects[i].activeInHierarchy)
             {
+                pooledObjects[i].transform.position = position;
+                pooledObjects[i].SetActive(true);
                 return pooledObjects[i];
             }
         }
-        return null; // Retourne null si tous les objets sont utilisés
+        return null;
     }
 }

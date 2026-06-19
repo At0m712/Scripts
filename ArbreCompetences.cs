@@ -1,48 +1,46 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using System;
 
 public class ArbreCompetences : MonoBehaviour
 {
-    [Header("UI Textes Généraux")]
+    [Header("Textes")]
     public TextMeshProUGUI cristauxDisponiblesText;
     
-    [Header("Compétence 1 : Réduction Coût des Étages")]
+    [Header("Compétence 1 : Réduction de Coût")]
+    public int coutReductionLevel = 0;
+    public double coutReductionPriceBase = 10;
     public TextMeshProUGUI coutReductionLevelText;
     public TextMeshProUGUI coutReductionPriceText;
     public Button coutReductionBtn;
-    public int coutReductionLevel = 0;
-    private double coutReductionPriceBase = 10; // Prix de départ en cristaux
 
-    [Header("Compétence 2 : Bonus Production Globale")]
+    [Header("Compétence 2 : Bonus Production")]
+    public int prodBonusLevel = 0;
+    public double prodBonusPriceBase = 25;
     public TextMeshProUGUI prodBonusLevelText;
     public TextMeshProUGUI prodBonusPriceText;
     public Button prodBonusBtn;
-    public int prodBonusLevel = 0;
-    private double prodBonusPriceBase = 25; // Prix de départ en cristaux
 
-    private void Start()
+    void Start()
     {
         LoadCompetences();
-        
         coutReductionBtn.onClick.AddListener(BuyCoutReduction);
         prodBonusBtn.onClick.AddListener(BuyProdBonus);
-        
-        UpdateUI();
     }
 
-    private void Update()
+    void Update()
     {
-        // Mise à jour de l'interactivité des boutons selon les cristaux disponibles
+        // Grise les boutons si pas assez de cristaux
         double cristaux = GameManager.Instance.temporalCrystals;
         coutReductionBtn.interactable = (cristaux >= GetPrice(coutReductionPriceBase, coutReductionLevel));
         prodBonusBtn.interactable = (cristaux >= GetPrice(prodBonusPriceBase, prodBonusLevel));
     }
 
-    // L'inflation des prix dans l'arbre de talent (coûte 1.5x plus cher à chaque niveau)
+    // Le prix augmente de 50% à chaque niveau (Ex: 10, 15, 22, 33...)
     private double GetPrice(double basePrice, int level)
     {
-        return basePrice * Mathf.Pow(1.5f, level); 
+        return Math.Floor(basePrice * Math.Pow(1.5f, level)); 
     }
 
     public void BuyCoutReduction()
@@ -50,12 +48,9 @@ public class ArbreCompetences : MonoBehaviour
         double price = GetPrice(coutReductionPriceBase, coutReductionLevel);
         if (GameManager.Instance.temporalCrystals >= price)
         {
-            GameManager.Instance.temporalCrystals -= price;
+            GameManager.Instance.temporalCrystals -= (int)price;
             coutReductionLevel++;
             SaveCompetences();
-            UpdateUI();
-            
-            // Note: Pour appliquer la réduction, votre script UpgradeShopUI devra lire `coutReductionLevel`
         }
     }
 
@@ -64,47 +59,37 @@ public class ArbreCompetences : MonoBehaviour
         double price = GetPrice(prodBonusPriceBase, prodBonusLevel);
         if (GameManager.Instance.temporalCrystals >= price)
         {
-            GameManager.Instance.temporalCrystals -= price;
+            GameManager.Instance.temporalCrystals -= (int)price;
             prodBonusLevel++;
-            ApplyCompetences();
             SaveCompetences();
-            UpdateUI();
         }
-    }
-
-    private void ApplyCompetences()
-    {
-        // Chaque niveau donne +10% de production de base dans le GameManager
-        GameManager.Instance.globalMultiplier = 1f + (prodBonusLevel * 0.1f); 
-    }
-
-    private void UpdateUI()
-    {
-        ScoreUI scoreUI = FindObjectOfType<ScoreUI>();
-        
-        if(scoreUI != null)
-        {
-            cristauxDisponiblesText.text = "Cristaux: " + scoreUI.FormatNumber(GameManager.Instance.temporalCrystals);
-            
-            coutReductionPriceText.text = scoreUI.FormatNumber(GetPrice(coutReductionPriceBase, coutReductionLevel)) + " Cristaux";
-            prodBonusPriceText.text = scoreUI.FormatNumber(GetPrice(prodBonusPriceBase, prodBonusLevel)) + " Cristaux";
-        }
-
-        coutReductionLevelText.text = "Niveau " + coutReductionLevel;
-        prodBonusLevelText.text = "Niveau " + prodBonusLevel;
     }
 
     private void SaveCompetences()
     {
-        PlayerPrefs.SetInt("Skill_CoutReduction", coutReductionLevel);
-        PlayerPrefs.SetInt("Skill_ProdBonus", prodBonusLevel);
+        PlayerPrefs.SetInt("Arbre_CostReduc", coutReductionLevel);
+        PlayerPrefs.SetInt("Arbre_ProdBonus", prodBonusLevel);
         PlayerPrefs.Save();
+        
+        GameManager.Instance.RecalculateMultiplier(); // Applique le bonus !
+        UpdateUI();
     }
 
     private void LoadCompetences()
     {
-        coutReductionLevel = PlayerPrefs.GetInt("Skill_CoutReduction", 0);
-        prodBonusLevel = PlayerPrefs.GetInt("Skill_ProdBonus", 0);
-        ApplyCompetences();
+        coutReductionLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
+        prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
+        UpdateUI();
+    }
+
+    public void UpdateUI()
+    {
+        cristauxDisponiblesText.text = "Cristaux : " + GameManager.Instance.temporalCrystals;
+        
+        coutReductionLevelText.text = "Niveau " + coutReductionLevel;
+        coutReductionPriceText.text = GetPrice(coutReductionPriceBase, coutReductionLevel) + " Cristaux";
+        
+        prodBonusLevelText.text = "Niveau " + prodBonusLevel;
+        prodBonusPriceText.text = GetPrice(prodBonusPriceBase, prodBonusLevel) + " Cristaux";
     }
 }

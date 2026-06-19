@@ -1,98 +1,73 @@
 using UnityEngine;
+using TMPro;
 using System;
-
-[Serializable]
-public class SaveData
-{
-    public long lastSaveTimestamp;
-    public double manaCurrent;
-    public double manaTotalProduced;
-    public double temporalCrystals;
-}
 
 public class SaveManager : MonoBehaviour
 {
-    private string saveKey = "TourSorcierSave";
-    public GameObject offlinePopup; // Fenêtre UI de retour
-    public TMPro.TextMeshProUGUI offlineGainsText;
+    public GameObject offlinePopup;
+    public TextMeshProUGUI offlineGainsText;
+    private double pendingOfflineGains = 0;
 
-    private double offlineGains = 0;
-
-    private void Start()
+    void Start()
     {
         LoadGame();
-        CalculateOfflineGains();
-        InvokeRepeating(nameof(SaveGame), 30f, 30f); // Sauvegarde auto toutes les 30 sec
-    }
-
-    private void OnApplicationQuit()
-    {
-        SaveGame();
+        InvokeRepeating("SaveGame", 30f, 30f); // Sauvegarde automatique toutes les 30s
     }
 
     public void SaveGame()
     {
-        SaveData data = new SaveData
-        {
-            lastSaveTimestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds(),
-            manaCurrent = GameManager.Instance.manaCurrent,
-            manaTotalProduced = GameManager.Instance.manaTotalProduced,
-            temporalCrystals = GameManager.Instance.temporalCrystals
-        };
-
-        string json = JsonUtility.ToJson(data);
-        PlayerPrefs.SetString(saveKey, json);
+        PlayerPrefs.SetString("manaCurrent", GameManager.Instance.manaCurrent.ToString());
+        PlayerPrefs.SetString("manaTotalProduced", GameManager.Instance.manaTotalProduced.ToString());
+        PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
+        PlayerPrefs.SetString("lastSaveTime", DateTime.Now.ToBinary().ToString());
         PlayerPrefs.Save();
     }
 
     private void LoadGame()
     {
-        if (PlayerPrefs.HasKey(saveKey))
+        if (PlayerPrefs.HasKey("manaCurrent"))
         {
-            string json = PlayerPrefs.GetString(saveKey);
-            SaveData data = JsonUtility.FromJson<SaveData>(json);
+            GameManager.Instance.manaCurrent = double.Parse(PlayerPrefs.GetString("manaCurrent"));
+            GameManager.Instance.manaTotalProduced = double.Parse(PlayerPrefs.GetString("manaTotalProduced"));
+            GameManager.Instance.temporalCrystals = PlayerPrefs.GetInt("temporalCrystals");
+            GameManager.Instance.RecalculateMultiplier();
 
-            GameManager.Instance.manaCurrent = data.manaCurrent;
-            GameManager.Instance.manaTotalProduced = data.manaTotalProduced;
-            GameManager.Instance.temporalCrystals = data.temporalCrystals;
+            CalculateOfflineGains();
         }
     }
 
     private void CalculateOfflineGains()
     {
-        if (!PlayerPrefs.HasKey(saveKey)) return;
+        long temp = Convert.ToInt64(PlayerPrefs.GetString("lastSaveTime"));
+        DateTime lastSaveTime = DateTime.FromBinary(temp);
+        TimeSpan timePassed = DateTime.Now - lastSaveTime;
 
-        string json = PlayerPrefs.GetString(saveKey);
-        SaveData data = JsonUtility.FromJson<SaveData>(json);
+        double secondsPassed = timePassed.TotalSeconds;
+        
+        // Limite à 24h max d'absence (86400 secondes)
+        if (secondsPassed > 86400) secondsPassed = 86400;
 
-        long currentTime = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
-        long timeAwaySeconds = currentTime - data.lastSaveTimestamp;
-
-        // Limite de stockage : 2 heures maximum (7200 secondes)
-        if (timeAwaySeconds > 7200) timeAwaySeconds = 7200;
-
-        if (timeAwaySeconds > 60 && GameManager.Instance.manaPerSecond > 0) // Si parti plus de 1 minute
+        if (secondsPassed > 60 && GameManager.Instance.manaPerSecond > 0) // Si parti + d'1 minute
         {
-            offlineGains = timeAwaySeconds * GameManager.Instance.manaPerSecond;
-            
-            ScoreUI scoreUI = FindObjectOfType<ScoreUI>();
-            offlineGainsText.text = "Gains hors-ligne : \n" + scoreUI.FormatNumber(offlineGains) + " Mana";
-            offlinePopup.SetActive(true);
+            pendingOfflineGains = secondsPassed * (GameManager.Instance.manaPerSecond * GameManager.Instance.globalMultiplier);
+            offlineGainsText.text = ScoreUI.FormatNumber(pendingOfflineGains) + " Mana !";
+            offlinePopup.GetComponent<PopupAnimator>().Ouvrir();
         }
     }
 
-    // À lier au bouton "Récupérer" basique
     public void CollectOfflineGains()
     {
-        GameManager.Instance.AddMana(offlineGains);
-        offlinePopup.SetActive(false);
+        GameManager.Instance.AddMana(pendingOfflineGains);
+        offlinePopup.GetComponent<PopupAnimator>().Fermer();
     }
 
-    // À lier au bouton "Vidéo Pub x3"
     public void CollectOfflineGainsAdBoost()
     {
-        GameManager.Instance.AddMana(offlineGains * 3);
-        offlinePopup.SetActive(false);
-        // Appeler ici AdMobManager pour lancer la vidéo
+        // TODO: Appeler l'API de pub ici. Si succès :
+        GameManager.Instance.AddMana(pendingOfflineGains * 2); // Pub = x2
+        offlinePopup.GetComponent<PopupAnimator>().Fermer();
     }
+
+    void OnApplicationQuit() { SaveGame(); }
+    void OnApplicationPause(bool pause) { if(pause) SaveGame(); }
 }
