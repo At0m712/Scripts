@@ -1,55 +1,96 @@
 using UnityEngine;
-using UnityEngine.UI;
 using TMPro;
+using UnityEngine.UI;
+using System;
 
 public class BoutonMultiplicateurUI : MonoBehaviour
 {
-    public Button boostButton;
-    public TextMeshProUGUI timerText; // Optionnel : pour afficher le temps restant
+    [Header("Éléments du Bouton")]
+    [Tooltip("Le texte qui affiche le chrono (ex: 00:10:00)")]
+    public TextMeshProUGUI texteChrono; 
     
-    private float boostDuration = 14400f; // 4 heures en secondes
+    [Tooltip("L'image de la jauge qui se remplit (Type: Filled)")]
+    public Image jaugeTemps; 
+    
+    [Tooltip("Le texte qui affiche le multiplicateur actuel (ex: 2X)")]
+    public TextMeshProUGUI texteNiveau; 
 
-    private void Start()
+    [Header("Visuels d'état (Optionnel)")]
+    [Tooltip("Objet à allumer quand c'est inactif (ex: icône grise)")]
+    public GameObject visuelInactif; 
+    [Tooltip("Objet à allumer quand c'est actif (ex: icône qui brille)")]
+    public GameObject visuelActif; 
+
+    private const float TEMPS_MAX_SECONDES = 3600f; // 1 Heure
+
+    void Update()
     {
-        boostButton.onClick.AddListener(OnBoostButtonClicked);
+        // On actualise le bouton en permanence pour suivre le chrono
+        SynchroniserBouton();
     }
 
-    private void Update()
+    private void SynchroniserBouton()
     {
-        if (GameManager.Instance == null) return;
+        // 1. Lecture des données sauvegardées (Exactement comme dans le Pop-up)
+        int multi = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
+        string dateFinString = PlayerPrefs.GetString("dateFinMultiplicateur", "");
 
-        // Met à jour l'affichage du temps s'il y a un boost actif
-        if (GameManager.Instance.adBoostTimer > 0)
+        DateTime finBonus;
+        DateTime maintenant = DateTime.Now;
+
+        bool isActif = false;
+        TimeSpan tempsRestant = TimeSpan.Zero;
+
+        // 2. Vérification du temps restant
+        if (!string.IsNullOrEmpty(dateFinString) && DateTime.TryParse(dateFinString, out finBonus))
         {
-            if (timerText != null)
+            if (finBonus > maintenant)
             {
-                int hours = Mathf.FloorToInt(GameManager.Instance.adBoostTimer / 3600);
-                int minutes = Mathf.FloorToInt((GameManager.Instance.adBoostTimer % 3600) / 60);
-                timerText.text = string.Format("{0:00}:{1:00}", hours, minutes);
+                isActif = true;
+                tempsRestant = finBonus - maintenant;
+            }
+            else
+            {
+                multi = 1; // Temps écoulé
             }
         }
-        else
-        {
-            if (timerText != null) timerText.text = "BOOST x2";
-        }
-    }
 
-    private void OnBoostButtonClicked()
-    {
-        // Ici, vous appellerez AdMobManager.Instance.ShowRewardedAd(ActivateBoost);
-        // Pour le moment, on active le boost directement :
-        ActivateBoost();
-    }
-
-    public void ActivateBoost()
-    {
-        if (GameManager.Instance != null)
+        // 3. Synchronisation du Chrono
+        if (texteChrono != null)
         {
-            GameManager.Instance.adBoostMultiplier = 2f;
-            // On peut cumuler le temps si le joueur regarde plusieurs pubs
-            GameManager.Instance.adBoostTimer += boostDuration; 
-            
-            if (AudioManager.Instance != null) AudioManager.Instance.PlayCash();
+            if (isActif)
+            {
+                texteChrono.text = string.Format("{0:D2}:{1:D2}:{2:D2}", tempsRestant.Hours, tempsRestant.Minutes, tempsRestant.Seconds);
+            }
+            else
+            {
+                // Quand c'est inactif
+                texteChrono.text = "OFF"; 
+            }
         }
+
+        // 4. Synchronisation de la Jauge de temps
+        if (jaugeTemps != null)
+        {
+            if (isActif)
+            {
+                float ratioTemps = (float)tempsRestant.TotalSeconds / TEMPS_MAX_SECONDES;
+                jaugeTemps.fillAmount = Mathf.Clamp01(ratioTemps);
+            }
+            else
+            {
+                jaugeTemps.fillAmount = 0f;
+            }
+        }
+
+        // 5. Synchronisation du Texte du Multiplicateur (1X, 2X, etc.)
+        if (texteNiveau != null)
+        {
+            texteNiveau.text = multi + "X"; 
+        }
+
+        // 6. Gestion des visuels d'état
+        if (visuelInactif != null) visuelInactif.SetActive(!isActif);
+        if (visuelActif != null) visuelActif.SetActive(isActif);
     }
 }
