@@ -1,13 +1,13 @@
 using UnityEngine;
 using UnityEngine.EventSystems;
 using TMPro;
+using System; // Obligatoire pour utiliser les formules mathématiques comme Math.Floor
 
 public class ClicManuel : MonoBehaviour, IPointerDownHandler
 {
     [Header("Paramètres de clic")]
     public double baseClickPower = 1;
 
-    // Cette fonction détecte le contact exact sur l'écran (mobile & PC)
     public void OnPointerDown(PointerEventData eventData)
     {
         if (GameManager.Instance == null) return;
@@ -16,18 +16,17 @@ public class ClicManuel : MonoBehaviour, IPointerDownHandler
         double gain = baseClickPower * GameManager.Instance.globalMultiplier;
         GameManager.Instance.AddMana(gain);
 
-        // 2. Audio (Avec pitch aléatoire pour plus de dynamisme)
+        // 2. Audio (Avec précision UnityEngine.Random pour éviter les conflits avec System)
         if (AudioManager.Instance != null && AudioManager.Instance.clickSound != null)
         {
-            AudioManager.Instance.sfxSource.pitch = Random.Range(0.9f, 1.1f);
+            AudioManager.Instance.sfxSource.pitch = UnityEngine.Random.Range(0.9f, 1.1f);
             AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.clickSound);
         }
 
-        // 3. Feedback Visuel (Pool d'objets)
+        // 3. Feedback Visuel
         if (ObjectPooler.Instance != null)
         {
-            // Décalage léger pour éviter que les textes s'empilent
-            Vector3 randomOffset = new Vector3(Random.Range(-40f, 40f), Random.Range(-40f, 40f), 0);
+            Vector3 randomOffset = new Vector3(UnityEngine.Random.Range(-40f, 40f), UnityEngine.Random.Range(-40f, 40f), 0);
             Vector3 spawnPos = new Vector3(eventData.position.x, eventData.position.y, 0) + randomOffset; 
             
             GameObject popupText = ObjectPooler.Instance.SpawnFromPool(spawnPos);
@@ -37,7 +36,7 @@ public class ClicManuel : MonoBehaviour, IPointerDownHandler
                 if (textComp != null)
                 {
                     textComp.text = "+ " + Math.Floor(gain).ToString();
-                    textComp.color = new Color(0.2f, 0.8f, 1f); // Bleu cyan magique
+                    textComp.color = new Color(0.2f, 0.8f, 1f); 
                 }
             }
         }
