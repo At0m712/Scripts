@@ -41,9 +41,7 @@ public class MultiplicateurUI : MonoBehaviour
     public GameObject elementExtra; 
 
     [Header("Vidéo et Notifications")]
-    [Tooltip("L'objet contenant la vidéo (S'allume de 2X à 4X)")]
     public GameObject objetVideo; 
-    [Tooltip("L'image du point d'exclamation (S'allume uniquement en 1X)")]
     public GameObject imageExclamation; 
 
     [Header("Image dynamique (Changement de couleur)")]
@@ -71,7 +69,7 @@ public class MultiplicateurUI : MonoBehaviour
 
     public void LancerPubBoost()
     {
-        boutonPub.interactable = false;
+        if (boutonPub != null) boutonPub.interactable = false;
 
         if (AdMobManager.Instance != null)
         {
@@ -82,24 +80,20 @@ public class MultiplicateurUI : MonoBehaviour
         }
         else
         {
-            // Sécurité si on joue dans l'éditeur sans pub chargée
             AppliquerRecompensePub();
         }
     }
 
     private void AppliquerRecompensePub()
     {
-        // 1. On lit le niveau actuel (1 par défaut)
         int currentMulti = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
         
-        // 2. On augmente jusqu'à 4 maximum
         if (currentMulti < 4) 
         {
             currentMulti++;
             PlayerPrefs.SetInt("multiplicateurArgentActuel", currentMulti);
         }
 
-        // 3. On ajoute 1H au compteur
         DateTime finActuelle;
         string dateFinString = PlayerPrefs.GetString("dateFinMultiplicateur", "");
 
@@ -112,9 +106,8 @@ public class MultiplicateurUI : MonoBehaviour
             PlayerPrefs.SetString("dateFinMultiplicateur", DateTime.Now.AddHours(1).ToString());
         }
 
-        PlayerPrefs.Save(); // On force la sauvegarde
+        PlayerPrefs.Save(); 
 
-        // 4. On met à jour le GameManager
         if (GameManager.Instance != null)
         {
             GameManager.Instance.adBoostMultiplier = currentMulti;
@@ -131,7 +124,6 @@ public class MultiplicateurUI : MonoBehaviour
 
     public void MettreAJourAffichage()
     {
-        // On lit les données depuis PlayerPrefs
         int multi = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
         string dateFinString = PlayerPrefs.GetString("dateFinMultiplicateur", "");
 
@@ -155,78 +147,76 @@ public class MultiplicateurUI : MonoBehaviour
             }
         }
 
-        if (isActif)
+        // Sécurités sur les textes de temps
+        if (timerText != null)
         {
-            timerText.text = string.Format("{0:D2}:{1:D2}:{2:D2}", tempsRestant.Hours, tempsRestant.Minutes, tempsRestant.Seconds);
-            
-            if (barreTempsRouge != null)
-            {
-                float ratioTemps = (float)tempsRestant.TotalSeconds / TEMPS_MAX_SECONDES;
-                barreTempsRouge.fillAmount = Mathf.Clamp01(ratioTemps); 
-            }
-        }
-        else
-        {
-            timerText.text = "00:00:00";
-            if (barreTempsRouge != null) barreTempsRouge.fillAmount = 0f;
+            timerText.text = isActif ? string.Format("{0:D2}:{1:D2}:{2:D2}", tempsRestant.Hours, tempsRestant.Minutes, tempsRestant.Seconds) : "00:00:00";
         }
 
-        fond2X.color = (multi >= 2) ? couleurActif : couleurInactif;
-        fond3X.color = (multi >= 3) ? couleurActif : couleurInactif;
-        fond4X.color = (multi >= 4) ? couleurActif : couleurInactif;
+        if (barreTempsRouge != null)
+        {
+            float ratioTemps = (float)tempsRestant.TotalSeconds / TEMPS_MAX_SECONDES;
+            barreTempsRouge.fillAmount = isActif ? Mathf.Clamp01(ratioTemps) : 0f; 
+        }
 
+        // Sécurités sur les images de fond
+        if (fond2X != null) fond2X.color = (multi >= 2) ? couleurActif : couleurInactif;
+        if (fond3X != null) fond3X.color = (multi >= 3) ? couleurActif : couleurInactif;
+        if (fond4X != null) fond4X.color = (multi >= 4) ? couleurActif : couleurInactif;
+
+        // Sécurités sur les textes selon le niveau
         if (multi <= 1) 
         {
-            titreText.text = "BOOST INACTIF";
-            boutonText.text = "ACTIVER 2X (PUB)";
-            descriptionText.text = "Regarde une pub pour doubler tes gains !";
-            texteStatut.text = "Gains normaux (1X)";
+            if (titreText != null) titreText.text = "BOOST INACTIF";
+            if (boutonText != null) boutonText.text = "ACTIVER 2X (PUB)";
+            if (descriptionText != null) descriptionText.text = "Regarde une pub pour doubler tes gains !";
+            if (texteStatut != null) texteStatut.text = "Gains normaux (1X)";
 
             ActiverVisuels(true, false, false, false); 
             if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage1X;
-            boutonPub.interactable = true;
+            if (boutonPub != null) boutonPub.interactable = true;
         }
         else if (multi == 2) 
         {
-            titreText.text = "BOOST ACTIF !";
-            boutonText.text = "PASSER EN 3X (PUB)";
-            descriptionText.text = "Regarde une pub pour tripler tes gains !";
-            texteStatut.text = "Gains doublés (2X)";
+            if (titreText != null) titreText.text = "BOOST ACTIF !";
+            if (boutonText != null) boutonText.text = "PASSER EN 3X (PUB)";
+            if (descriptionText != null) descriptionText.text = "Regarde une pub pour tripler tes gains !";
+            if (texteStatut != null) texteStatut.text = "Gains doublés (2X)";
 
             ActiverVisuels(false, true, false, false); 
             if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage2X;
-            boutonPub.interactable = true;
+            if (boutonPub != null) boutonPub.interactable = true;
         }
         else if (multi == 3) 
         {
-            titreText.text = "BOOST ACTIF !";
-            boutonText.text = "PASSER EN 4X (PUB)";
-            descriptionText.text = "Regarde une pub pour quadrupler tes gains !";
-            texteStatut.text = "Gains triplés (3X)";
+            if (titreText != null) titreText.text = "BOOST ACTIF !";
+            if (boutonText != null) boutonText.text = "PASSER EN 4X (PUB)";
+            if (descriptionText != null) descriptionText.text = "Regarde une pub pour quadrupler tes gains !";
+            if (texteStatut != null) texteStatut.text = "Gains triplés (3X)";
 
             ActiverVisuels(false, false, true, false); 
             if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage3X;
-            boutonPub.interactable = true;
+            if (boutonPub != null) boutonPub.interactable = true;
         }
         else if (multi >= 4) 
         {
-            titreText.text = "BOOST MAXIMUM !";
-            texteStatut.text = "Gains quadruplés (4X)";
+            if (titreText != null) titreText.text = "BOOST MAXIMUM !";
+            if (texteStatut != null) texteStatut.text = "Gains quadruplés (4X)";
 
             ActiverVisuels(false, false, false, true); 
             if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage4X;
             
             if (tempsRestant.TotalMinutes >= 59.9f)
             {
-                boutonText.text = "BOOST MAX";
-                descriptionText.text = "Tu as atteint le temps maximum !";
-                boutonPub.interactable = false;
+                if (boutonText != null) boutonText.text = "BOOST MAX";
+                if (descriptionText != null) descriptionText.text = "Tu as atteint le temps maximum !";
+                if (boutonPub != null) boutonPub.interactable = false;
             }
             else
             {
-                boutonText.text = "+ 1 HEURE (PUB)";
-                descriptionText.text = "Regarde une pub pour ajouter 1H !";
-                boutonPub.interactable = true;
+                if (boutonText != null) boutonText.text = "+ 1 HEURE (PUB)";
+                if (descriptionText != null) descriptionText.text = "Regarde une pub pour ajouter 1H !";
+                if (boutonPub != null) boutonPub.interactable = true;
             }
         }
     }

@@ -1,5 +1,4 @@
 using UnityEngine;
-using System;
 
 public class GameManager : MonoBehaviour
 {
@@ -12,81 +11,85 @@ public class GameManager : MonoBehaviour
     public int temporalCrystals = 0;
 
     [Header("Multiplicateurs")]
-    public float globalMultiplier = 1f; 
-    public float adBoostMultiplier = 1f; 
-    public float adBoostTimer = 0f; // Réintégré pour la pub
+    public double globalMultiplier = 1.0;
+    public double adBoostMultiplier = 1.0;
+    public float adBoostTimer = 0f;
     public float costReductionBonus = 0f;
+    public double rushMultiplier = 10.0;
+    public bool IsRushActive = false;
 
-    [Header("Surcharge (Rush)")]
-    public float rushMultiplier = 10f;
     private float rushTimer = 0f;
-    public bool IsRushActive => rushTimer > 0;
 
     void Awake()
     {
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
+
+        // Au lancement, on force la production à 0. 
+        // Ce sont les étages (UpgradeShopUI) qui vont la recalculer juste après !
+        manaPerSecond = 0;
     }
 
     void Update()
     {
-        // 1. Gestion du Boost Pub
         if (adBoostTimer > 0)
         {
             adBoostTimer -= Time.deltaTime;
-            adBoostMultiplier = 2f;
-        }
-        else
-        {
-            adBoostMultiplier = 1f;
+            if (adBoostTimer <= 0)
+            {
+                adBoostTimer = 0;
+                adBoostMultiplier = 1.0; 
+            }
         }
 
-        // 2. Gestion du Timer de Surcharge
-        if (rushTimer > 0)
+        if (IsRushActive)
         {
             rushTimer -= Time.deltaTime;
+            if (rushTimer <= 0)
+            {
+                IsRushActive = false;
+            }
         }
 
-        // 3. Production de mana par seconde
         if (manaPerSecond > 0)
         {
             double currentMulti = globalMultiplier * adBoostMultiplier;
             if (IsRushActive) currentMulti *= rushMultiplier;
 
-            double manaToGive = (manaPerSecond * currentMulti) * Time.deltaTime;
-            AddMana(manaToGive);
+            double manaToAdd = (manaPerSecond * currentMulti) * Time.deltaTime;
+            manaCurrent += manaToAdd;
+            manaTotalProduced += manaToAdd;
         }
     }
 
     public void AddMana(double amount)
     {
-        if (double.IsNaN(amount) || amount <= 0) return; 
         manaCurrent += amount;
         manaTotalProduced += amount;
     }
 
     public bool SpendMana(double amount)
     {
-        if (manaCurrent >= amount && amount > 0)
+        if (manaCurrent >= amount)
         {
             manaCurrent -= amount;
-            return true; 
+            return true;
         }
-        return false; 
+        return false;
     }
 
-    public void ActivateRush(float durationInSeconds)
+    public void ActivateRush(float duration)
     {
-        rushTimer = durationInSeconds;
+        IsRushActive = true;
+        rushTimer = duration;
     }
 
-    // RÉINTÉGRATION DE LA FONCTION POUR L'ARBRE DE COMPÉTENCES
     public void RecalculateMultiplier()
     {
         int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
-        globalMultiplier = 1f + (prodBonusLevel * 0.5f);
-        
         int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
-        costReductionBonus = costReducLevel * 0.01f;
+
+        globalMultiplier = 1.0 + (prodBonusLevel * 0.05); 
+        costReductionBonus = Mathf.Min(0.50f, costReducLevel * 0.02f); 
     }
 }

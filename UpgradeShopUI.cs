@@ -15,8 +15,6 @@ public class UpgradeShopUI : MonoBehaviour
     public TextMeshProUGUI costText;
     public TextMeshProUGUI productionText;
     public Button upgradeButton;
-    
-    [Tooltip("Nouveau texte sur le bouton pour afficher +1, +10, +MAX")]
     public TextMeshProUGUI upgradeButtonText; 
     
     [Header("Jauge de Progression vers Palier")]
@@ -35,7 +33,15 @@ public class UpgradeShopUI : MonoBehaviour
         currentLevel = PlayerPrefs.GetInt("FloorLevel_" + myFloorData.name, 0);
         if (nameText != null) nameText.text = myFloorData.name;
         
+        // Calcule les stats au démarrage
         RecalculerStats();
+
+        // ⚠️ LE CORRECTIF EST ICI : On ajoute notre production au GameManager au lancement !
+        if (GameManager.Instance != null && currentLevel > 0)
+        {
+            GameManager.Instance.manaPerSecond += currentProduction;
+        }
+
         upgradeButton.onClick.AddListener(AcheterNiveau);
         InvokeRepeating(nameof(VerifierArgent), 0.1f, 0.2f);
     }
@@ -44,7 +50,6 @@ public class UpgradeShopUI : MonoBehaviour
     {
         if (GameManager.Instance == null) return;
         
-        // Si on est en mode MAX, le coût peut changer dès que notre mana monte
         if (BuyModeManager.Instance != null && BuyModeManager.Instance.currentMode == BuyMode.MAX)
         {
              RecalculerStats();
@@ -132,7 +137,6 @@ public class UpgradeShopUI : MonoBehaviour
         }
         else
         {
-            // Même si on ne peut pas l'acheter, on affiche le prix d'1 niveau
             CalculateCostForLevels(currentLevel, 1, discount, out double costForOne);
             costText.text = ScoreUI.FormatNumber(costForOne);
             if (upgradeButtonText != null) upgradeButtonText.text = "+1";
@@ -142,7 +146,6 @@ public class UpgradeShopUI : MonoBehaviour
         MettreAJourJauge();
     }
 
-    // Mathématiques de la série géométrique
     private void CalculateCostForLevels(int startLevel, int levelsToAdd, double discount, out double totalCost)
     {
         double baseCost = myFloorData.baseCost;
@@ -169,7 +172,6 @@ public class UpgradeShopUI : MonoBehaviour
         }
     }
 
-    // Moteur des Paliers
     private double CalculerMultiplicateurPalier(int niveau)
     {
         double mult = 1.0;
