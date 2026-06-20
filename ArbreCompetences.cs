@@ -22,22 +22,31 @@ public class ArbreCompetences : MonoBehaviour
     public TextMeshProUGUI prodBonusPriceText;
     public Button prodBonusBtn;
 
+    // Cache pour éviter de calculer Math.Pow() 60 fois par seconde
+    private double currentCoutReductionPrice;
+    private double currentProdBonusPrice;
+
     void Start()
     {
         LoadCompetences();
         coutReductionBtn.onClick.AddListener(BuyCoutReduction);
         prodBonusBtn.onClick.AddListener(BuyProdBonus);
+        
+        // On vérifie si le joueur a l'argent 2 fois par sec (Ultra opti)
+        InvokeRepeating(nameof(CheckButtonsState), 0.1f, 0.5f);
     }
 
-    void Update()
+    private void CheckButtonsState()
     {
-        // Grise les boutons si pas assez de cristaux
+        if (GameManager.Instance == null) return;
+        
         double cristaux = GameManager.Instance.temporalCrystals;
-        coutReductionBtn.interactable = (cristaux >= GetPrice(coutReductionPriceBase, coutReductionLevel));
-        prodBonusBtn.interactable = (cristaux >= GetPrice(prodBonusPriceBase, prodBonusLevel));
+        coutReductionBtn.interactable = (cristaux >= currentCoutReductionPrice);
+        prodBonusBtn.interactable = (cristaux >= currentProdBonusPrice);
+        
+        cristauxDisponiblesText.text = "Cristaux : " + GameManager.Instance.temporalCrystals;
     }
 
-    // Le prix augmente de 50% à chaque niveau (Ex: 10, 15, 22, 33...)
     private double GetPrice(double basePrice, int level)
     {
         return Math.Floor(basePrice * Math.Pow(1.5f, level)); 
@@ -45,23 +54,27 @@ public class ArbreCompetences : MonoBehaviour
 
     public void BuyCoutReduction()
     {
-        double price = GetPrice(coutReductionPriceBase, coutReductionLevel);
-        if (GameManager.Instance.temporalCrystals >= price)
+        if (GameManager.Instance.temporalCrystals >= currentCoutReductionPrice)
         {
-            GameManager.Instance.temporalCrystals -= (int)price;
+            GameManager.Instance.temporalCrystals -= (int)currentCoutReductionPrice;
             coutReductionLevel++;
             SaveCompetences();
+            
+            if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+                AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
         }
     }
 
     public void BuyProdBonus()
     {
-        double price = GetPrice(prodBonusPriceBase, prodBonusLevel);
-        if (GameManager.Instance.temporalCrystals >= price)
+        if (GameManager.Instance.temporalCrystals >= currentProdBonusPrice)
         {
-            GameManager.Instance.temporalCrystals -= (int)price;
+            GameManager.Instance.temporalCrystals -= (int)currentProdBonusPrice;
             prodBonusLevel++;
             SaveCompetences();
+            
+            if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+                AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
         }
     }
 
@@ -71,8 +84,9 @@ public class ArbreCompetences : MonoBehaviour
         PlayerPrefs.SetInt("Arbre_ProdBonus", prodBonusLevel);
         PlayerPrefs.Save();
         
-        GameManager.Instance.RecalculateMultiplier(); // Applique le bonus !
+        GameManager.Instance.RecalculateMultiplier(); 
         UpdateUI();
+        CheckButtonsState();
     }
 
     private void LoadCompetences()
@@ -84,12 +98,13 @@ public class ArbreCompetences : MonoBehaviour
 
     public void UpdateUI()
     {
-        cristauxDisponiblesText.text = "Cristaux : " + GameManager.Instance.temporalCrystals;
-        
+        currentCoutReductionPrice = GetPrice(coutReductionPriceBase, coutReductionLevel);
+        currentProdBonusPrice = GetPrice(prodBonusPriceBase, prodBonusLevel);
+
         coutReductionLevelText.text = "Niveau " + coutReductionLevel;
-        coutReductionPriceText.text = GetPrice(coutReductionPriceBase, coutReductionLevel) + " Cristaux";
+        coutReductionPriceText.text = currentCoutReductionPrice + " Cristaux";
         
         prodBonusLevelText.text = "Niveau " + prodBonusLevel;
-        prodBonusPriceText.text = GetPrice(prodBonusPriceBase, prodBonusLevel) + " Cristaux";
+        prodBonusPriceText.text = currentProdBonusPrice + " Cristaux";
     }
 }

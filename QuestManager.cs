@@ -8,18 +8,20 @@ public class QuestManager : MonoBehaviour
     public static QuestManager Instance;
 
     [Header("Quête 1 : Améliorations")]
-    public int q1Goal = 5; // Acheter 5 niveaux
+    public int q1Goal = 5; 
     public int q1Progress = 0;
     public bool q1Claimed = false;
     public TextMeshProUGUI q1Text;
     public Button q1Btn;
+    public TextMeshProUGUI q1BtnText; 
 
     [Header("Quête 2 : Utiliser la Surcharge")]
-    public int q2Goal = 3; // Utiliser le sort de Rush 3 fois
+    public int q2Goal = 3; 
     public int q2Progress = 0;
     public bool q2Claimed = false;
     public TextMeshProUGUI q2Text;
     public Button q2Btn;
+    public TextMeshProUGUI q2BtnText; 
 
     void Awake()
     {
@@ -56,10 +58,7 @@ public class QuestManager : MonoBehaviour
         q2Progress = 0; q2Claimed = false;
         SaveQuests();
     }
-
-    // --- FONCTIONS POUR FAIRE PROGRESSER LES QUÊTES ---
     
-    // À appeler dans UpgradeShopUI.cs dans la fonction BuyUpgrade() : QuestManager.Instance.AddUpgradeProgress();
     public void AddUpgradeProgress()
     {
         if (!q1Claimed && q1Progress < q1Goal)
@@ -70,7 +69,6 @@ public class QuestManager : MonoBehaviour
         }
     }
 
-    // À appeler dans GameManager.cs dans la fonction ActivateRush() : QuestManager.Instance.AddRushProgress();
     public void AddRushProgress()
     {
         if (!q2Claimed && q2Progress < q2Goal)
@@ -81,26 +79,29 @@ public class QuestManager : MonoBehaviour
         }
     }
 
-    // --- RÉCOMPENSES ---
-
     public void ClaimQuest1()
     {
-        GameManager.Instance.temporalCrystals += 2; // Récompense premium
+        GameManager.Instance.temporalCrystals += 2; 
         q1Claimed = true;
         SaveQuests();
         UpdateUI();
-        // TODO: Jouer son de validation
+        
+        // TODO COMPLÉTÉ
+        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
     }
 
     public void ClaimQuest2()
     {
-        GameManager.Instance.adBoostTimer += 3600f; // +1h de boost
+        GameManager.Instance.adBoostTimer += 3600f; 
         q2Claimed = true;
         SaveQuests();
         UpdateUI();
-    }
 
-    // --- SAUVEGARDE ET UI ---
+        // TODO COMPLÉTÉ
+        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+    }
 
     private void SaveQuests()
     {
@@ -123,10 +124,10 @@ public class QuestManager : MonoBehaviour
     {
         q1Text.text = $"Améliorer la tour ({q1Progress}/{q1Goal})";
         q1Btn.interactable = (q1Progress >= q1Goal && !q1Claimed);
-        q1Btn.GetComponentInChildren<TextMeshProUGUI>().text = q1Claimed ? "RÉCUPÉRÉ" : "RÉCUPÉRER";
+        if (q1BtnText != null) q1BtnText.text = q1Claimed ? "RÉCUPÉRÉ" : "RÉCUPÉRER";
 
         q2Text.text = $"Utiliser Surcharge ({q2Progress}/{q2Goal})";
         q2Btn.interactable = (q2Progress >= q2Goal && !q2Claimed);
-        q2Btn.GetComponentInChildren<TextMeshProUGUI>().text = q2Claimed ? "RÉCUPÉRÉ" : "RÉCUPÉRER";
+        if (q2BtnText != null) q2BtnText.text = q2Claimed ? "RÉCUPÉRÉ" : "RÉCUPÉRER";
     }
 }

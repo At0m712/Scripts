@@ -11,11 +11,12 @@ public class SaveManager : MonoBehaviour
     void Start()
     {
         LoadGame();
-        InvokeRepeating("SaveGame", 30f, 30f); // Sauvegarde automatique toutes les 30s
+        InvokeRepeating("SaveGame", 30f, 30f); 
     }
 
     public void SaveGame()
     {
+        if (GameManager.Instance == null) return;
         PlayerPrefs.SetString("manaCurrent", GameManager.Instance.manaCurrent.ToString());
         PlayerPrefs.SetString("manaTotalProduced", GameManager.Instance.manaTotalProduced.ToString());
         PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
@@ -27,9 +28,9 @@ public class SaveManager : MonoBehaviour
     {
         if (PlayerPrefs.HasKey("manaCurrent"))
         {
-            GameManager.Instance.manaCurrent = double.Parse(PlayerPrefs.GetString("manaCurrent"));
-            GameManager.Instance.manaTotalProduced = double.Parse(PlayerPrefs.GetString("manaTotalProduced"));
-            GameManager.Instance.temporalCrystals = PlayerPrefs.GetInt("temporalCrystals");
+            double.TryParse(PlayerPrefs.GetString("manaCurrent", "0"), out GameManager.Instance.manaCurrent);
+            double.TryParse(PlayerPrefs.GetString("manaTotalProduced", "0"), out GameManager.Instance.manaTotalProduced);
+            GameManager.Instance.temporalCrystals = PlayerPrefs.GetInt("temporalCrystals", 0);
             GameManager.Instance.RecalculateMultiplier();
 
             CalculateOfflineGains();
@@ -38,45 +39,50 @@ public class SaveManager : MonoBehaviour
 
     private void CalculateOfflineGains()
     {
-        long temp = Convert.ToInt64(PlayerPrefs.GetString("lastSaveTime"));
+        string savedTimeStr = PlayerPrefs.GetString("lastSaveTime", "");
+        
+        // SÉCURITÉ ANTI-CRASH (Si la sauvegarde est vide ou corrompue)
+        if (string.IsNullOrEmpty(savedTimeStr) || !long.TryParse(savedTimeStr, out long temp))
+            return;
+
         DateTime lastSaveTime = DateTime.FromBinary(temp);
         TimeSpan timePassed = DateTime.Now - lastSaveTime;
 
         double secondsPassed = timePassed.TotalSeconds;
         
-        // Limite à 24h max d'absence (86400 secondes)
         if (secondsPassed > 86400) secondsPassed = 86400;
 
-        if (secondsPassed > 60 && GameManager.Instance.manaPerSecond > 0) // Si parti + d'1 minute
+        if (secondsPassed > 60 && GameManager.Instance.manaPerSecond > 0) 
         {
             pendingOfflineGains = secondsPassed * (GameManager.Instance.manaPerSecond * GameManager.Instance.globalMultiplier);
             offlineGainsText.text = ScoreUI.FormatNumber(pendingOfflineGains) + " Mana !";
-            offlinePopup.GetComponent<PopupAnimator>().Ouvrir();
+            if (offlinePopup != null) offlinePopup.GetComponent<PopupAnimator>().Ouvrir();
         }
     }
 
     public void CollectOfflineGains()
     {
         GameManager.Instance.AddMana(pendingOfflineGains);
-        offlinePopup.GetComponent<PopupAnimator>().Fermer();
+        if (offlinePopup != null) offlinePopup.GetComponent<PopupAnimator>().Fermer();
+        
+        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
     }
 
     public void CollectOfflineGainsAdBoost()
     {
-        // APPEL PUB COMPLÉTÉ
         if (AdMobManager.Instance != null)
         {
             AdMobManager.Instance.ShowRewardedAd(() => 
             {
                 GameManager.Instance.AddMana(pendingOfflineGains * 2);
-                offlinePopup.GetComponent<PopupAnimator>().Fermer();
+                if (offlinePopup != null) offlinePopup.GetComponent<PopupAnimator>().Fermer();
             });
         }
         else
         {
-            // Sécurité de test (si AdMobManager n'est pas encore dans la scène)
             GameManager.Instance.AddMana(pendingOfflineGains * 2); 
-            offlinePopup.GetComponent<PopupAnimator>().Fermer();
+            if (offlinePopup != null) offlinePopup.GetComponent<PopupAnimator>().Fermer();
         }
     }
 
