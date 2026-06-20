@@ -1,4 +1,5 @@
 using UnityEngine;
+using System; 
 
 public class GameManager : MonoBehaviour
 {
@@ -13,6 +14,7 @@ public class GameManager : MonoBehaviour
     [Header("Multiplicateurs")]
     public double globalMultiplier = 1.0;
     public double adBoostMultiplier = 1.0;
+    public double prestigeMultiplier = 1.0; 
     public float adBoostTimer = 0f;
     public float costReductionBonus = 0f;
     public double rushMultiplier = 10.0;
@@ -25,9 +27,33 @@ public class GameManager : MonoBehaviour
         if (Instance == null) Instance = this;
         else Destroy(gameObject);
 
-        // Au lancement, on force la production à 0. 
-        // Ce sont les étages (UpgradeShopUI) qui vont la recalculer juste après !
         manaPerSecond = 0;
+        
+        if (PlayerPrefs.HasKey("prestigeMultiplier"))
+        {
+            double.TryParse(PlayerPrefs.GetString("prestigeMultiplier", "1"), out prestigeMultiplier);
+        }
+        if (prestigeMultiplier < 1.0) prestigeMultiplier = 1.0;
+    }
+
+    void Start()
+    {
+        string dateFinString = PlayerPrefs.GetString("dateFinMultiplicateur", "");
+        if (!string.IsNullOrEmpty(dateFinString) && DateTime.TryParse(dateFinString, out DateTime finBonus))
+        {
+            if (finBonus > DateTime.Now)
+            {
+                adBoostMultiplier = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
+                adBoostTimer = (float)(finBonus - DateTime.Now).TotalSeconds;
+            }
+            else
+            {
+                PlayerPrefs.SetInt("multiplicateurArgentActuel", 1);
+                adBoostMultiplier = 1.0;
+                adBoostTimer = 0f;
+            }
+        }
+        RecalculateMultiplier();
     }
 
     void Update()
@@ -49,16 +75,6 @@ public class GameManager : MonoBehaviour
             {
                 IsRushActive = false;
             }
-        }
-
-        if (manaPerSecond > 0)
-        {
-            double currentMulti = globalMultiplier * adBoostMultiplier;
-            if (IsRushActive) currentMulti *= rushMultiplier;
-
-            double manaToAdd = (manaPerSecond * currentMulti) * Time.deltaTime;
-            manaCurrent += manaToAdd;
-            manaTotalProduced += manaToAdd;
         }
     }
 
@@ -89,7 +105,26 @@ public class GameManager : MonoBehaviour
         int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
         int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
 
-        globalMultiplier = 1.0 + (prodBonusLevel * 0.05); 
+        double bonusCristauxPassif = temporalCrystals * 0.02;
+        double baseMulti = 1.0 + (prodBonusLevel * 0.05); 
+        globalMultiplier = (baseMulti + bonusCristauxPassif) * prestigeMultiplier; 
+        
         costReductionBonus = Mathf.Min(0.50f, costReducLevel * 0.02f); 
+    }
+
+    // Le GameManager interroge tous les étages pour afficher le "+ X / sec" correct en haut de l'écran
+    public void CalculerDPSGlobal()
+    {
+        double totalDPS = 0;
+        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
+        
+        foreach (var etage in tousLesEtages)
+        {
+            if (etage.currentLevel > 0)
+            {
+                totalDPS += etage.ObtenirDPS();
+            }
+        }
+        manaPerSecond = totalDPS;
     }
 }

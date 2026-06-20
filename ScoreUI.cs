@@ -45,15 +45,24 @@ public class ScoreUI : MonoBehaviour
     }
 
     public static string FormatNumber(double value)
-    {
-        if (value < 1000) return Math.Floor(value).ToString();
+{
+    // SÉCURITÉ 1 : Si le nombre est cassé ou négatif, on affiche 0
+    if (double.IsNaN(value) || value < 0) return "0";
+    
+    // SÉCURITÉ 2 : Si le nombre est trop grand (Infini), on bloque
+    if (double.IsInfinity(value)) return "MAX";
 
-        string[] suffixes = { "", "K", "M", "B", "T", "AA", "AB", "AC", "AD", "AE" };
-        int suffixIndex = (int)Math.Floor(Math.Log10(value) / 3);
-        
-        if (suffixIndex >= suffixes.Length) suffixIndex = suffixes.Length - 1;
+    if (value < 1000) return Math.Floor(value).ToString();
 
-        double displayValue = value / Math.Pow(10, suffixIndex * 3);
-        return displayValue.ToString("F2") + " " + suffixes[suffixIndex];
-    }
+    string[] suffixes = { "", "k", "M", "B", "T", "aa", "ab", "ac", "ad", "ae", "af", "ag", "ah", "ai", "aj", "ak", "al", "am", "an", "ao", "ap", "aq", "ar", "as", "at", "au", "av", "aw", "ax", "ay", "az" };
+    
+    int suffixIndex = (int)Math.Floor(Math.Log10(value) / 3);
+
+    // SÉCURITÉ 3 : On empêche l'index de sortir des limites de la liste "suffixes"
+    if (suffixIndex < 0) suffixIndex = 0;
+    if (suffixIndex >= suffixes.Length) suffixIndex = suffixes.Length - 1;
+
+    double displayNum = value / Math.Pow(10, suffixIndex * 3);
+    return displayNum.ToString("F2") + " " + suffixes[suffixIndex];
+}
 }
