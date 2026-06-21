@@ -13,7 +13,7 @@ public class ScoreUI : MonoBehaviour
     private int lastCrystals = -1;
     private double lastProd = -1;
 
-    void Update()
+void Update()
     {
         if (GameManager.Instance == null) return;
 
@@ -31,10 +31,9 @@ public class ScoreUI : MonoBehaviour
             crystalsText.text = lastCrystals.ToString();
         }
         
-        // 3. Calcul de la production
-        double currentMulti = GameManager.Instance.globalMultiplier * GameManager.Instance.adBoostMultiplier;
-        if (GameManager.Instance.IsRushActive) currentMulti *= GameManager.Instance.rushMultiplier;
-        double actualProd = GameManager.Instance.manaPerSecond * currentMulti;
+        // 3. LA CORRECTION EST ICI ! 
+        // On récupère directement la valeur pure, car les étages l'ont déjà multipliée.
+        double actualProd = GameManager.Instance.manaPerSecond;
 
         // 4. Optimisation : Production / sec
         if (actualProd != lastProd)
@@ -43,7 +42,6 @@ public class ScoreUI : MonoBehaviour
             manaPerSecText.text = "+ " + FormatNumber(actualProd) + " / sec";
         }
     }
-
     public static string FormatNumber(double value)
 {
     // SÉCURITÉ 1 : Si le nombre est cassé ou négatif, on affiche 0

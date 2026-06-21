@@ -19,14 +19,13 @@ public class UpgradeShopUI : MonoBehaviour
     public TextMeshProUGUI upgradeButtonText; 
     
     [Header("Jauge de Production")]
-    [Tooltip("Cette jauge se remplit avec le temps. Une fois pleine, elle donne le Mana.")]
     public Image jaugeProgression; 
 
     private double currentCostToBuy; 
     private int levelsToBuy; 
     
-    // Variables de Temps
-    private double currentProductionAmount;
+    // Variables propres à la production
+    private double currentBaseYield; // La production de BASE (sans bonus)
     private float currentProductionTime;
     private float timer = 0f;
 
@@ -35,7 +34,6 @@ public class UpgradeShopUI : MonoBehaviour
         if (myFloorData == null) return;
         
         currentLevel = PlayerPrefs.GetInt("FloorLevel_" + myFloorData.name, 0);
-        // On récupère le chrono là où il s'est arrêté à la dernière partie !
         timer = PlayerPrefs.GetFloat("FloorTimer_" + myFloorData.name, 0f);
 
         if (nameText != null) nameText.text = myFloorData.name;
@@ -49,7 +47,6 @@ public class UpgradeShopUI : MonoBehaviour
     {
         if (currentLevel > 0 && currentProductionTime > 0)
         {
-            // Le Rush accélère la jauge de l'étage x10 au lieu d'augmenter la valeur !
             float speedMultiplier = 1f;
             if (GameManager.Instance != null && GameManager.Instance.IsRushActive)
             {
@@ -63,15 +60,14 @@ public class UpgradeShopUI : MonoBehaviour
                 jaugeProgression.fillAmount = timer / currentProductionTime;
             }
 
-            // DÈS QUE LA JAUGE EST PLEINE :
             if (timer >= currentProductionTime)
             {
-                timer -= currentProductionTime; // On réinitialise sans perdre de millisecondes
+                timer -= currentProductionTime; 
 
+                // On donne EXACTEMENT l'argent défini par la méthode finale, avec 1 seul multiplicateur !
                 if (GameManager.Instance != null)
                 {
-                    double finalYield = currentProductionAmount * GameManager.Instance.globalMultiplier * GameManager.Instance.adBoostMultiplier;
-                    GameManager.Instance.AddMana(finalYield);
+                    GameManager.Instance.AddMana(GetActualYield());
                 }
             }
         }
@@ -141,7 +137,6 @@ public class UpgradeShopUI : MonoBehaviour
         else
         {
             BuyMode mode = BuyModeManager.Instance != null ? BuyModeManager.Instance.currentMode : BuyMode.x1;
-
             int targetLevelsToAdd = 1;
             if (mode == BuyMode.x1) targetLevelsToAdd = 1;
             else if (mode == BuyMode.x10) targetLevelsToAdd = 10;
@@ -156,32 +151,31 @@ public class UpgradeShopUI : MonoBehaviour
             }
         }
 
-        // --- LA MAGIE DU TEMPS ---
-        double yield = myFloorData.baseProduction * currentLevel;
+        // --- CALCULE DE BASE EXCLUSIF (Sans les Multiplicateurs Globaux !) ---
+        double baseYield = 0;
         float time = myFloorData.baseProductionTime;
 
-        // Paliers de Vitesse
-        int[] paliers = { 25, 50, 75, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 };
-
-        foreach (int palier in paliers)
+        if (currentLevel > 0)
         {
-            if (currentLevel >= palier)
+            baseYield = myFloorData.baseProduction * currentLevel * CalculerMultiplicateurPalier(currentLevel);
+
+            int[] paliers = { 25, 50, 75, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 };
+            foreach (int palier in paliers)
             {
-                time /= 2f; // On divise le temps par 2 à chaque palier atteint !
+                if (currentLevel >= palier) time /= 2f; 
+            }
+
+            if (time < 1f && time > 0f)
+            {
+                baseYield *= (1f / time);
+                time = 1f;
             }
         }
 
-        // Si la barre va plus vite qu'1 seconde, on bloque le temps et on booste les gains
-        if (time < 1f)
-        {
-            yield *= (1f / time);
-            time = 1f;
-        }
-
-        currentProductionAmount = yield;
+        currentBaseYield = baseYield;
         currentProductionTime = time;
 
-        // --- INTERFACE ---
+        // --- INTERFACE VISUELLE ---
         levelText.text = "Niv. " + currentLevel;
         
         if (isFreeUnlock)
@@ -203,25 +197,43 @@ public class UpgradeShopUI : MonoBehaviour
             if (upgradeButtonText != null) upgradeButtonText.text = "+1";
         }
 
-        // Affichage dynamique (ex: 120 / 3s, ou 120 / sec)
+        // On affiche le chiffre exact (Base * Prestige * Arbre * Pubs)
+        double yieldToDisplay = GetActualYield();
+
         if (currentLevel == 0)
             productionText.text = "0 / sec";
         else
         {
             if (currentProductionTime <= 1f)
-                productionText.text = ScoreUI.FormatNumber(currentProductionAmount) + " / sec";
+                productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / sec";
             else if (currentProductionTime < 60f)
-                productionText.text = ScoreUI.FormatNumber(currentProductionAmount) + " / " + Math.Round(currentProductionTime, 1) + "s";
+                productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Math.Round(currentProductionTime, 1) + "s";
             else
-                productionText.text = ScoreUI.FormatNumber(currentProductionAmount) + " / " + Math.Round(currentProductionTime / 60f, 1) + "m";
+                productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Math.Round(currentProductionTime / 60f, 1) + "m";
         }
 
         GameManager.Instance.CalculerDPSGlobal();
     }
 
+    // Fonction maîtresse : rassemble la base et les bonus du GameManager UNE SEULE FOIS.
+    public double GetActualYield()
+    {
+        if (GameManager.Instance == null) return currentBaseYield;
+        return currentBaseYield * GameManager.Instance.globalMultiplier * GameManager.Instance.adBoostMultiplier;
+    }
+
+    // Le DPS utilisé par le GameManager pour afficher en haut de l'écran (Prend en compte le Rush)
     public double ObtenirDPS()
     {
-        if (currentProductionTime > 0) return currentProductionAmount / currentProductionTime;
+        if (currentProductionTime > 0) 
+        {
+            double dps = GetActualYield() / currentProductionTime;
+            if (GameManager.Instance != null && GameManager.Instance.IsRushActive)
+            {
+                dps *= GameManager.Instance.rushMultiplier;
+            }
+            return dps;
+        }
         return 0;
     }
 
@@ -266,6 +278,19 @@ public class UpgradeShopUI : MonoBehaviour
         if (affordableLevels > 0) CalculateCostForLevels(startLevel, affordableLevels, discount, out totalCost);
     }
 
+    private double CalculerMultiplicateurPalier(int niveau)
+    {
+        double mult = 1.0;
+        if (niveau >= 25) mult *= 1.5; 
+        if (niveau >= 75) mult *= 2.0; 
+        if (niveau >= 100)
+        {
+            int centaines = niveau / 100;
+            mult *= Math.Pow(2.0, centaines); 
+        }
+        return mult;
+    }
+
     private int ObtenirProchainPalier(int niveau)
     {
         if (niveau < 25) return 25;
@@ -275,7 +300,6 @@ public class UpgradeShopUI : MonoBehaviour
         return ((niveau / 100) + 1) * 100;
     }
 
-    // Sauvegarde le timer quand on ferme le jeu pour ne pas perdre la production en cours
     void OnDisable()
     {
         if (myFloorData != null) PlayerPrefs.SetFloat("FloorTimer_" + myFloorData.name, timer);

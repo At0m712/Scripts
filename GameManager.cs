@@ -8,7 +8,7 @@ public class GameManager : MonoBehaviour
     [Header("Ressources")]
     public double manaCurrent = 0;
     public double manaTotalProduced = 0;
-    public double manaPerSecond = 0;
+    public double manaPerSecond = 0; // Sert uniquement à l'affichage Global désormais !
     public int temporalCrystals = 0;
 
     [Header("Multiplicateurs")]
@@ -58,6 +58,9 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
+        // On gère uniquement les chronos ici. 
+        // L'AJOUT DE MANA A ÉTÉ SUPPRIMÉ ! Ce sont les étages qui gèrent.
+
         if (adBoostTimer > 0)
         {
             adBoostTimer -= Time.deltaTime;
@@ -65,6 +68,7 @@ public class GameManager : MonoBehaviour
             {
                 adBoostTimer = 0;
                 adBoostMultiplier = 1.0; 
+                ActualiserTousLesEtages(); // On met à jour l'UI quand la pub se termine
             }
         }
 
@@ -74,6 +78,7 @@ public class GameManager : MonoBehaviour
             if (rushTimer <= 0)
             {
                 IsRushActive = false;
+                CalculerDPSGlobal(); // On remet le texte DPS normal
             }
         }
     }
@@ -98,6 +103,7 @@ public class GameManager : MonoBehaviour
     {
         IsRushActive = true;
         rushTimer = duration;
+        CalculerDPSGlobal(); // Met à jour le texte visuel avec le x10
     }
 
     public void RecalculateMultiplier()
@@ -107,12 +113,13 @@ public class GameManager : MonoBehaviour
 
         double bonusCristauxPassif = temporalCrystals * 0.02;
         double baseMulti = 1.0 + (prodBonusLevel * 0.05); 
+        
+        // LE SEUL ENDROIT où le Prestige est calculé !
         globalMultiplier = (baseMulti + bonusCristauxPassif) * prestigeMultiplier; 
         
         costReductionBonus = Mathf.Min(0.50f, costReducLevel * 0.02f); 
     }
 
-    // Le GameManager interroge tous les étages pour afficher le "+ X / sec" correct en haut de l'écran
     public void CalculerDPSGlobal()
     {
         double totalDPS = 0;
@@ -126,5 +133,11 @@ public class GameManager : MonoBehaviour
             }
         }
         manaPerSecond = totalDPS;
+    }
+
+    public void ActualiserTousLesEtages()
+    {
+        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
+        foreach (var etage in tousLesEtages) etage.RecalculerStats();
     }
 }
