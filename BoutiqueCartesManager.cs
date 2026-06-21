@@ -71,11 +71,17 @@ public class BoutiqueCartesManager : MonoBehaviour
             
             if (carte.typeBonus == TypeBonusCarte.MultiplicateurProduction)
             {
+                // CORRECTION : Les multiplicateurs s'additionnent (+50% et +50% = +100%)
+                // Au lieu de se multiplier exponentiellement (1.5 * 1.5 = 2.25)
                 float currentMulti = PlayerPrefs.GetFloat("BonusProd_" + nomEtage, 1f);
-                PlayerPrefs.SetFloat("BonusProd_" + nomEtage, currentMulti * carte.valeurBonus);
+                
+                // Si la carte est x1.5, la valeur à ajouter est 0.5
+                float bonusAAjouter = carte.valeurBonus - 1f; 
+                PlayerPrefs.SetFloat("BonusProd_" + nomEtage, currentMulti + bonusAAjouter);
             }
             else if (carte.typeBonus == TypeBonusCarte.ReductionCout)
             {
+                // Pour les coûts, on multiplie. Sinon on pourrait avoir -110% de réduction (prix négatif !)
                 float currentReduc = PlayerPrefs.GetFloat("BonusCost_" + nomEtage, 1f);
                 PlayerPrefs.SetFloat("BonusCost_" + nomEtage, currentReduc * carte.valeurBonus);
             }
