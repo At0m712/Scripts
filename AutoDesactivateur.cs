@@ -2,20 +2,23 @@ using UnityEngine;
 
 public class AutoDesactivateur : MonoBehaviour
 {
-    public float dureeDeVie = 1.5f; // Disparaît après 1.5 seconde
+    [Header("Configuration")]
+    public float tempsAvantDesactivation = 2f;
+    private float chrono;
 
     void OnEnable()
     {
-        Invoke("DesactiverObjet", dureeDeVie);
+        // On réinitialise le chrono à chaque fois que l'objet sort du pool
+        chrono = tempsAvantDesactivation;
     }
 
-    void DesactiverObjet()
+    void Update()
     {
-        gameObject.SetActive(false);
-    }
-    
-    void OnDisable()
-    {
-        CancelInvoke();
+        chrono -= Time.deltaTime;
+        if (chrono <= 0)
+        {
+            // OPTIMISATION : On désactive l'objet pour qu'il retourne dans le Pool, on NE LE DÉTRUIT PAS.
+            gameObject.SetActive(false);
+        }
     }
 }

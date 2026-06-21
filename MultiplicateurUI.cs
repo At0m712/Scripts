@@ -31,28 +31,26 @@ public class MultiplicateurUI : MonoBehaviour
     public GameObject perso3X;
     public GameObject perso4X;
 
-    [Header("Fonds Statut (Objets à allumer/éteindre)")]
+    [Header("Fonds Statut")]
     public GameObject fondStatut1X;
     public GameObject fondStatut2X;
     public GameObject fondStatut3X;
     public GameObject fondStatut4X;
 
-    [Header("Élément Extra (S'allume à partir de 2X)")]
+    [Header("Élément Extra")]
     public GameObject elementExtra; 
-
-    [Header("Vidéo et Notifications")]
     public GameObject objetVideo; 
     public GameObject imageExclamation; 
 
-    [Header("Image dynamique (Changement de couleur)")]
+    [Header("Image dynamique")]
     public Image imageDynamiqueCouleur;
     public Color couleurImage1X = new Color(0.5f, 0.5f, 0.5f, 1f); 
     public Color couleurImage2X = new Color(0.2f, 0.8f, 0.2f, 1f); 
     public Color couleurImage3X = new Color(0.1f, 0.5f, 0.8f, 1f); 
     public Color couleurImage4X = new Color(1f, 0.8f, 0f, 1f);     
 
-    // CORRECTION : On passe la jauge à 4 Heures Max pour permettre de stocker le X4 !
     private const float TEMPS_MAX_SECONDES = 14400f; 
+    private int cacheSecondesTimer = -1;
 
     void Start()
     {
@@ -72,175 +70,144 @@ public class MultiplicateurUI : MonoBehaviour
     {
         if (boutonPub != null) boutonPub.interactable = false;
 
-        if (AdMobManager.Instance != null)
-        {
-            AdMobManager.Instance.ShowRewardedAd(() => 
-            {
-                AppliquerRecompensePub();
-            });
-        }
-        else
-        {
-            AppliquerRecompensePub();
-        }
+        if (AdMobManager.Instance != null) AdMobManager.Instance.ShowRewardedAd(() => AppliquerRecompensePub());
+        else AppliquerRecompensePub();
     }
 
     private void AppliquerRecompensePub()
     {
         int currentMulti = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
-        
-        if (currentMulti < 4) 
-        {
-            currentMulti++;
-            PlayerPrefs.SetInt("multiplicateurArgentActuel", currentMulti);
-        }
+        if (currentMulti < 4) currentMulti++;
 
         DateTime finActuelle;
         string dateFinString = PlayerPrefs.GetString("dateFinMultiplicateur", "");
 
-        if (DateTime.TryParse(dateFinString, out finActuelle) && finActuelle > DateTime.Now)
-        {
-            finActuelle = finActuelle.AddHours(1);
-            PlayerPrefs.SetString("dateFinMultiplicateur", finActuelle.ToString());
-        }
-        else
-        {
-            finActuelle = DateTime.Now.AddHours(1);
-            PlayerPrefs.SetString("dateFinMultiplicateur", finActuelle.ToString());
-        }
+        if (DateTime.TryParse(dateFinString, out finActuelle) && finActuelle > DateTime.Now) finActuelle = finActuelle.AddHours(1);
+        else finActuelle = DateTime.Now.AddHours(1);
 
+        PlayerPrefs.SetInt("multiplicateurArgentActuel", currentMulti);
+        PlayerPrefs.SetString("dateFinMultiplicateur", finActuelle.ToString());
         PlayerPrefs.Save(); 
 
         if (GameManager.Instance != null)
         {
             GameManager.Instance.adBoostMultiplier = currentMulti;
-            // CORRECTION : On synchronise le timer parfaitement au lieu d'ajouter 3600 aveuglément
             GameManager.Instance.adBoostTimer = (float)(finActuelle - DateTime.Now).TotalSeconds;
-            
-            // CORRECTION MAJEURE : On force les étages à mettre à jour leur production immédiatement !
             GameManager.Instance.ActualiserTousLesEtages();
         }
 
-        MettreAJourAffichage();
-
-        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
-        {
-            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
-        }
+        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null) AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
     }
 
     public void MettreAJourAffichage()
     {
-        int multi = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
-        string dateFinString = PlayerPrefs.GetString("dateFinMultiplicateur", "");
+        if (GameManager.Instance == null) return;
 
-        DateTime finBonus;
-        DateTime maintenant = DateTime.Now;
+        // OPTIMISATION MAX : Plus aucune lecture Disque, tout se fait via les infos RAM du GameManager
+        int multi = (int)GameManager.Instance.adBoostMultiplier;
+        float tempsRestantSec = GameManager.Instance.adBoostTimer;
+        bool isActif = tempsRestantSec > 0;
 
-        bool isActif = false;
-        TimeSpan tempsRestant = TimeSpan.Zero;
+        int secondesActuelles = (int)tempsRestantSec;
 
-        if (!string.IsNullOrEmpty(dateFinString) && DateTime.TryParse(dateFinString, out finBonus))
+        // On ne met à jour les textes que si 1 seconde s'est écoulée
+        if (cacheSecondesTimer != secondesActuelles)
         {
-            if (finBonus > maintenant)
+            cacheSecondesTimer = secondesActuelles;
+
+            if (timerText != null)
             {
-                isActif = true;
-                tempsRestant = finBonus - maintenant;
+                if (isActif)
+                {
+                    TimeSpan ts = TimeSpan.FromSeconds(secondesActuelles);
+                    timerText.text = string.Format("{0:D2}:{1:D2}:{2:D2}", (int)ts.TotalHours, ts.Minutes, ts.Seconds);
+                }
+                else timerText.text = "00:00:00";
             }
-            else
+
+            if (barreTempsRouge != null)
             {
-                multi = 1; 
-                PlayerPrefs.SetInt("multiplicateurArgentActuel", 1); 
+                float ratioTemps = tempsRestantSec / TEMPS_MAX_SECONDES;
+                barreTempsRouge.fillAmount = isActif ? Mathf.Clamp01(ratioTemps) : 0f; 
             }
-        }
 
-        if (timerText != null)
-        {
-            // Modification pour afficher les heures correctement même s'il y a plus de 1h
-            timerText.text = isActif ? string.Format("{0:D2}:{1:D2}:{2:D2}", (int)tempsRestant.TotalHours, tempsRestant.Minutes, tempsRestant.Seconds) : "00:00:00";
-        }
+            // Gestion de l'affichage UI
+            if (fond2X != null) fond2X.color = (multi >= 2) ? couleurActif : couleurInactif;
+            if (fond3X != null) fond3X.color = (multi >= 3) ? couleurActif : couleurInactif;
+            if (fond4X != null) fond4X.color = (multi >= 4) ? couleurActif : couleurInactif;
 
-        if (barreTempsRouge != null)
-        {
-            float ratioTemps = (float)tempsRestant.TotalSeconds / TEMPS_MAX_SECONDES;
-            barreTempsRouge.fillAmount = isActif ? Mathf.Clamp01(ratioTemps) : 0f; 
-        }
-
-        if (fond2X != null) fond2X.color = (multi >= 2) ? couleurActif : couleurInactif;
-        if (fond3X != null) fond3X.color = (multi >= 3) ? couleurActif : couleurInactif;
-        if (fond4X != null) fond4X.color = (multi >= 4) ? couleurActif : couleurInactif;
-
-        if (multi <= 1) 
-        {
-            if (titreText != null) titreText.text = "BOOST INACTIF";
-            if (boutonText != null) boutonText.text = "ACTIVER 2X (PUB)";
-            if (descriptionText != null) descriptionText.text = "Regarde une pub pour doubler tes gains !";
-            if (texteStatut != null) texteStatut.text = "Gains normaux (1X)";
-
-            ActiverVisuels(true, false, false, false); 
-            if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage1X;
-            if (boutonPub != null) boutonPub.interactable = true;
-        }
-        else if (multi == 2) 
-        {
-            if (titreText != null) titreText.text = "BOOST ACTIF !";
-            if (boutonText != null) boutonText.text = "PASSER EN 3X (PUB)";
-            if (descriptionText != null) descriptionText.text = "Regarde une pub pour tripler tes gains !";
-            if (texteStatut != null) texteStatut.text = "Gains doublés (2X)";
-
-            ActiverVisuels(false, true, false, false); 
-            if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage2X;
-            if (boutonPub != null) boutonPub.interactable = true;
-        }
-        else if (multi == 3) 
-        {
-            if (titreText != null) titreText.text = "BOOST ACTIF !";
-            if (boutonText != null) boutonText.text = "PASSER EN 4X (PUB)";
-            if (descriptionText != null) descriptionText.text = "Regarde une pub pour quadrupler tes gains !";
-            if (texteStatut != null) texteStatut.text = "Gains triplés (3X)";
-
-            ActiverVisuels(false, false, true, false); 
-            if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage3X;
-            if (boutonPub != null) boutonPub.interactable = true;
-        }
-        else if (multi >= 4) 
-        {
-            if (titreText != null) titreText.text = "BOOST MAXIMUM !";
-            if (texteStatut != null) texteStatut.text = "Gains quadruplés (4X)";
-
-            ActiverVisuels(false, false, false, true); 
-            if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage4X;
-            
-            // CORRECTION : On bloque le bouton uniquement s'il a cumulé 4 heures de temps !
-            if (tempsRestant.TotalMinutes >= 239f)
+            if (multi <= 1) 
             {
-                if (boutonText != null) boutonText.text = "BOOST MAX";
-                if (descriptionText != null) descriptionText.text = "Tu as atteint le temps maximum !";
-                if (boutonPub != null) boutonPub.interactable = false;
-            }
-            else
-            {
-                if (boutonText != null) boutonText.text = "+ 1 HEURE (PUB)";
-                if (descriptionText != null) descriptionText.text = "Regarde une pub pour ajouter 1H !";
+                if (titreText != null) titreText.text = "BOOST INACTIF";
+                if (boutonText != null) boutonText.text = "ACTIVER 2X (PUB)";
+                if (descriptionText != null) descriptionText.text = "Regarde une pub pour doubler tes gains !";
+                if (texteStatut != null) texteStatut.text = "Gains normaux (1X)";
+
+                ActiverVisuels(true, false, false, false); 
+                if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage1X;
                 if (boutonPub != null) boutonPub.interactable = true;
+            }
+            else if (multi == 2) 
+            {
+                if (titreText != null) titreText.text = "BOOST ACTIF !";
+                if (boutonText != null) boutonText.text = "PASSER EN 3X (PUB)";
+                if (descriptionText != null) descriptionText.text = "Regarde une pub pour tripler tes gains !";
+                if (texteStatut != null) texteStatut.text = "Gains doublés (2X)";
+
+                ActiverVisuels(false, true, false, false); 
+                if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage2X;
+                if (boutonPub != null) boutonPub.interactable = true;
+            }
+            else if (multi == 3) 
+            {
+                if (titreText != null) titreText.text = "BOOST ACTIF !";
+                if (boutonText != null) boutonText.text = "PASSER EN 4X (PUB)";
+                if (descriptionText != null) descriptionText.text = "Regarde une pub pour quadrupler tes gains !";
+                if (texteStatut != null) texteStatut.text = "Gains triplés (3X)";
+
+                ActiverVisuels(false, false, true, false); 
+                if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage3X;
+                if (boutonPub != null) boutonPub.interactable = true;
+            }
+            else if (multi >= 4) 
+            {
+                if (titreText != null) titreText.text = "BOOST MAXIMUM !";
+                if (texteStatut != null) texteStatut.text = "Gains quadruplés (4X)";
+
+                ActiverVisuels(false, false, false, true); 
+                if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage4X;
+                
+                if (secondesActuelles >= 14340f) // 239 min = 14340 sec
+                {
+                    if (boutonText != null) boutonText.text = "BOOST MAX";
+                    if (descriptionText != null) descriptionText.text = "Tu as atteint le temps maximum !";
+                    if (boutonPub != null) boutonPub.interactable = false;
+                }
+                else
+                {
+                    if (boutonText != null) boutonText.text = "+ 1 HEURE (PUB)";
+                    if (descriptionText != null) descriptionText.text = "Regarde une pub pour ajouter 1H !";
+                    if (boutonPub != null) boutonPub.interactable = true;
+                }
             }
         }
     }
 
     private void ActiverVisuels(bool etat1X, bool etat2X, bool etat3X, bool etat4X)
     {
-        if (perso1X != null) perso1X.SetActive(etat1X);
-        if (perso2X != null) perso2X.SetActive(etat2X);
-        if (perso3X != null) perso3X.SetActive(etat3X);
-        if (perso4X != null) perso4X.SetActive(etat4X);
+        if (perso1X != null && perso1X.activeSelf != etat1X) perso1X.SetActive(etat1X);
+        if (perso2X != null && perso2X.activeSelf != etat2X) perso2X.SetActive(etat2X);
+        if (perso3X != null && perso3X.activeSelf != etat3X) perso3X.SetActive(etat3X);
+        if (perso4X != null && perso4X.activeSelf != etat4X) perso4X.SetActive(etat4X);
 
-        if (fondStatut1X != null) fondStatut1X.SetActive(etat1X);
-        if (fondStatut2X != null) fondStatut2X.SetActive(etat2X);
-        if (fondStatut3X != null) fondStatut3X.SetActive(etat3X);
-        if (fondStatut4X != null) fondStatut4X.SetActive(etat4X);
+        if (fondStatut1X != null && fondStatut1X.activeSelf != etat1X) fondStatut1X.SetActive(etat1X);
+        if (fondStatut2X != null && fondStatut2X.activeSelf != etat2X) fondStatut2X.SetActive(etat2X);
+        if (fondStatut3X != null && fondStatut3X.activeSelf != etat3X) fondStatut3X.SetActive(etat3X);
+        if (fondStatut4X != null && fondStatut4X.activeSelf != etat4X) fondStatut4X.SetActive(etat4X);
 
-        if (elementExtra != null) elementExtra.SetActive(etat2X || etat3X || etat4X);
-        if (imageExclamation != null) imageExclamation.SetActive(etat1X);
-        if (objetVideo != null) objetVideo.SetActive(etat2X || etat3X || etat4X);
+        bool showExtra = etat2X || etat3X || etat4X;
+        if (elementExtra != null && elementExtra.activeSelf != showExtra) elementExtra.SetActive(showExtra);
+        if (imageExclamation != null && imageExclamation.activeSelf != etat1X) imageExclamation.SetActive(etat1X);
+        if (objetVideo != null && objetVideo.activeSelf != showExtra) objetVideo.SetActive(showExtra);
     }
 }

@@ -8,7 +8,7 @@ public class GameManager : MonoBehaviour
     [Header("Ressources")]
     public double manaCurrent = 0;
     public double manaTotalProduced = 0;
-    public double manaPerSecond = 0; // Sert uniquement à l'affichage Global désormais !
+    public double manaPerSecond = 0;
     public int temporalCrystals = 0;
 
     [Header("Multiplicateurs")]
@@ -58,9 +58,6 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        // On gère uniquement les chronos ici. 
-        // L'AJOUT DE MANA A ÉTÉ SUPPRIMÉ ! Ce sont les étages qui gèrent.
-
         if (adBoostTimer > 0)
         {
             adBoostTimer -= Time.deltaTime;
@@ -68,7 +65,7 @@ public class GameManager : MonoBehaviour
             {
                 adBoostTimer = 0;
                 adBoostMultiplier = 1.0; 
-                ActualiserTousLesEtages(); // On met à jour l'UI quand la pub se termine
+                ActualiserTousLesEtages();
             }
         }
 
@@ -78,7 +75,7 @@ public class GameManager : MonoBehaviour
             if (rushTimer <= 0)
             {
                 IsRushActive = false;
-                CalculerDPSGlobal(); // On remet le texte DPS normal
+                CalculerDPSGlobal(); 
             }
         }
     }
@@ -103,7 +100,7 @@ public class GameManager : MonoBehaviour
     {
         IsRushActive = true;
         rushTimer = duration;
-        CalculerDPSGlobal(); // Met à jour le texte visuel avec le x10
+        CalculerDPSGlobal(); 
     }
 
     public void RecalculateMultiplier()
@@ -114,22 +111,19 @@ public class GameManager : MonoBehaviour
         double bonusCristauxPassif = temporalCrystals * 0.02;
         double baseMulti = 1.0 + (prodBonusLevel * 0.05); 
         
-        // LE SEUL ENDROIT où le Prestige est calculé !
         globalMultiplier = (baseMulti + bonusCristauxPassif) * prestigeMultiplier; 
-        
         costReductionBonus = Mathf.Min(0.50f, costReducLevel * 0.02f); 
     }
 
     public void CalculerDPSGlobal()
     {
         double totalDPS = 0;
-        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
-        
-        foreach (var etage in tousLesEtages)
+        // OPTIMISATION MAX : On utilise la liste statique au lieu d'utiliser FindObjectsOfType
+        for (int i = 0; i < UpgradeShopUI.AllShops.Count; i++)
         {
-            if (etage.currentLevel > 0)
+            if (UpgradeShopUI.AllShops[i].currentLevel > 0)
             {
-                totalDPS += etage.ObtenirDPS();
+                totalDPS += UpgradeShopUI.AllShops[i].ObtenirDPS();
             }
         }
         manaPerSecond = totalDPS;
@@ -137,7 +131,10 @@ public class GameManager : MonoBehaviour
 
     public void ActualiserTousLesEtages()
     {
-        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
-        foreach (var etage in tousLesEtages) etage.RecalculerStats();
+        // OPTIMISATION MAX
+        for (int i = 0; i < UpgradeShopUI.AllShops.Count; i++)
+        {
+            UpgradeShopUI.AllShops[i].RecalculerStats();
+        }
     }
 }

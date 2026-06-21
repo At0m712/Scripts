@@ -2,14 +2,7 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 
-public enum BuyMode
-{
-    x1,
-    x10,
-    x100,
-    MAX,
-    NEXT
-}
+public enum BuyMode { x1, x10, x100, MAX, NEXT }
 
 public class BuyModeManager : MonoBehaviour
 {
@@ -27,10 +20,7 @@ public class BuyModeManager : MonoBehaviour
 
     void Start()
     {
-        if (toggleButton != null)
-        {
-            toggleButton.onClick.AddListener(ToggleMode);
-        }
+        if (toggleButton != null) toggleButton.onClick.AddListener(ToggleMode);
         UpdateUI();
     }
 
@@ -38,30 +28,19 @@ public class BuyModeManager : MonoBehaviour
     {
         switch (currentMode)
         {
-            case BuyMode.x1:
-                currentMode = BuyMode.x10;
-                break;
-            case BuyMode.x10:
-                currentMode = BuyMode.x100;
-                break;
-            case BuyMode.x100:
-                currentMode = BuyMode.MAX;
-                break;
-            case BuyMode.MAX:
-                currentMode = BuyMode.NEXT;
-                break;
-            case BuyMode.NEXT:
-                currentMode = BuyMode.x1;
-                break;
+            case BuyMode.x1: currentMode = BuyMode.x10; break;
+            case BuyMode.x10: currentMode = BuyMode.x100; break;
+            case BuyMode.x100: currentMode = BuyMode.MAX; break;
+            case BuyMode.MAX: currentMode = BuyMode.NEXT; break;
+            case BuyMode.NEXT: currentMode = BuyMode.x1; break;
         }
         
         UpdateUI();
         
-        // Prévient tous les étages de recalculer leurs prix avec le nouveau mode
-        UpgradeShopUI[] shops = FindObjectsOfType<UpgradeShopUI>();
-        foreach (var shop in shops)
+        // OPTIMISATION MAX : On utilise la liste pré-chargée en mémoire
+        for (int i = 0; i < UpgradeShopUI.AllShops.Count; i++)
         {
-            shop.RecalculerStats();
+            UpgradeShopUI.AllShops[i].RecalculerStats();
         }
     }
 

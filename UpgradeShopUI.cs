@@ -2,9 +2,13 @@ using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
 using System;
+using System.Collections.Generic;
 
 public class UpgradeShopUI : MonoBehaviour
 {
+    // OPTIMISATION : Liste statique pour un accès instantané depuis le GameManager
+    public static List<UpgradeShopUI> AllShops = new List<UpgradeShopUI>();
+
     [Header("Configuration")]
     public FloorData myFloorData;
     public int currentLevel = 0;
@@ -20,7 +24,7 @@ public class UpgradeShopUI : MonoBehaviour
     
     [Header("Jauge de Production")]
     public Image jaugeProgression; 
-    public GameObject objetChevrons; // L'objet qui contient l'effet visuel d'Overdrive
+    public GameObject objetChevrons; 
 
     private double currentCostToBuy; 
     private int levelsToBuy; 
@@ -28,19 +32,47 @@ public class UpgradeShopUI : MonoBehaviour
     private float currentProductionTime;
     private float timer = 0f;
 
+    // Caches pour l'optimisation
+    private float cardDiscount = 1f;
+    private float cardProdMulti = 1f;
+    private int cacheAffichageNiveau = -1;
+    private double cacheAffichageCout = -1;
+    private string cacheAffichageTexteBouton = "";
+
+    void OnEnable() { AllShops.Add(this); }
+    
+    void OnDisable()
+    {
+        AllShops.Remove(this);
+        if (myFloorData != null) PlayerPrefs.SetFloat("FloorTimer_" + myFloorData.name, timer);
+    }
+
     void Start()
     {
         if (myFloorData == null) return;
         
-        int minLevels = PlayerPrefs.GetInt("BonusLevels_" + myFloorData.name, 0);
-        currentLevel = PlayerPrefs.GetInt("FloorLevel_" + myFloorData.name, minLevels);
-
         timer = PlayerPrefs.GetFloat("FloorTimer_" + myFloorData.name, 0f);
         if (nameText != null) nameText.text = myFloorData.name;
         
+        ChargerBonus(); // Cache PlayerPrefs une seule fois au lieu d'à chaque calcul !
         RecalculerStats();
+        
         upgradeButton.onClick.AddListener(AcheterNiveau);
         InvokeRepeating(nameof(VerifierArgent), 0.1f, 0.2f);
+    }
+
+    public void ChargerBonus()
+    {
+        if (myFloorData == null) return;
+        cardDiscount = PlayerPrefs.GetFloat("BonusCost_" + myFloorData.name, 1f);
+        cardProdMulti = PlayerPrefs.GetFloat("BonusProd_" + myFloorData.name, 1f);
+        int minLevels = PlayerPrefs.GetInt("BonusLevels_" + myFloorData.name, 0);
+        
+        if (currentLevel < minLevels) 
+        {
+            currentLevel = minLevels;
+            PlayerPrefs.SetInt("FloorLevel_" + myFloorData.name, currentLevel);
+        }
     }
 
     void Update()
@@ -48,41 +80,31 @@ public class UpgradeShopUI : MonoBehaviour
         if (currentLevel > 0 && currentProductionTime > 0)
         {
             float speedMultiplier = 1f;
-            
-            // 1. Gestion de la compétence de Surcharge (Rush)
-            if (GameManager.Instance != null && GameManager.Instance.IsRushActive)
-            {
-                speedMultiplier = (float)GameManager.Instance.rushMultiplier;
-            }
+            if (GameManager.Instance != null && GameManager.Instance.IsRushActive) speedMultiplier = (float)GameManager.Instance.rushMultiplier;
 
             timer += Time.deltaTime * speedMultiplier;
 
-            // --- 2. GESTION VISUELLE DE L'OVERDRIVE (Chevrons) ---
             if (currentProductionTime <= 1f)
             {
                 if (jaugeProgression != null) jaugeProgression.fillAmount = 1f;
-                if (objetChevrons != null) objetChevrons.SetActive(true);
+                if (objetChevrons != null && !objetChevrons.activeSelf) objetChevrons.SetActive(true);
             }
             else
             {
                 if (jaugeProgression != null) jaugeProgression.fillAmount = timer / currentProductionTime;
-                if (objetChevrons != null) objetChevrons.SetActive(false);
+                if (objetChevrons != null && objetChevrons.activeSelf) objetChevrons.SetActive(false);
             }
 
-            // --- 3. GAIN DE MANA ---
             if (timer >= currentProductionTime)
             {
                 timer -= currentProductionTime; 
-                if (GameManager.Instance != null) 
-                {
-                    GameManager.Instance.AddMana(GetActualYield());
-                }
+                if (GameManager.Instance != null) GameManager.Instance.AddMana(GetActualYield());
             }
         }
         else
         {
             if (jaugeProgression != null) jaugeProgression.fillAmount = 0f;
-            if (objetChevrons != null) objetChevrons.SetActive(false);
+            if (objetChevrons != null && objetChevrons.activeSelf) objetChevrons.SetActive(false);
         }
     }
 
@@ -94,9 +116,10 @@ public class UpgradeShopUI : MonoBehaviour
             RecalculerStats();
         
         bool isFreeUnlock = (estLePremierEtage && currentLevel == 0);
-        
-        if (isFreeUnlock) upgradeButton.interactable = true;
-        else upgradeButton.interactable = (levelsToBuy > 0 && GameManager.Instance.manaCurrent >= currentCostToBuy);
+        bool canInteract = isFreeUnlock || (levelsToBuy > 0 && GameManager.Instance.manaCurrent >= currentCostToBuy);
+
+        if (upgradeButton.interactable != canInteract)
+            upgradeButton.interactable = canInteract;
     }
 
     public void AcheterNiveau()
@@ -123,30 +146,15 @@ public class UpgradeShopUI : MonoBehaviour
         }
     }
 
-    private double GetDiscountedBaseCost()
-    {
-        float cardDiscount = PlayerPrefs.GetFloat("BonusCost_" + myFloorData.name, 1f); 
-        return myFloorData.baseCost * cardDiscount;
-    }
-
     public void RecalculerStats()
     {
         if (myFloorData == null || GameManager.Instance == null) return;
-
-        // 1. Niveaux de départ (Cartes)
-        int minLevels = PlayerPrefs.GetInt("BonusLevels_" + myFloorData.name, 0);
-        if (currentLevel < minLevels) 
-        {
-            currentLevel = minLevels;
-            PlayerPrefs.SetInt("FloorLevel_" + myFloorData.name, currentLevel);
-        }
 
         double discount = 1f - GameManager.Instance.costReductionBonus;
         double currentMana = GameManager.Instance.manaCurrent;
         
         levelsToBuy = 0;
         currentCostToBuy = 0;
-
         bool isFreeUnlock = (estLePremierEtage && currentLevel == 0);
 
         if (isFreeUnlock)
@@ -178,30 +186,17 @@ public class UpgradeShopUI : MonoBehaviour
 
         if (currentLevel > 0)
         {
-            // Les cartes Sorciers (Additionnées proprement)
-            float cardProdMulti = PlayerPrefs.GetFloat("BonusProd_" + myFloorData.name, 1f);
-
             baseYield = myFloorData.baseProduction * currentLevel * cardProdMulti;
-
-            // NOUVEAU SYSTÈME DE PALIERS
             int[] paliers = { 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 };
             
             foreach (int palier in paliers)
             {
                 if (currentLevel >= palier) 
                 {
-                    if (time > 0.1f) 
-                    {
-                        time /= 2f;
-                    }
-                    else 
-                    {
-                        baseYield *= 2f;
-                    }
+                    if (time > 0.1f) time /= 2f;
+                    else baseYield *= 2f;
                 }
             }
-
-            // Sécurité finale
             if (time < 0.1f && time > 0f)
             {
                 baseYield *= (0.1f / time);
@@ -212,50 +207,47 @@ public class UpgradeShopUI : MonoBehaviour
         currentBaseYield = baseYield;
         currentProductionTime = time;
 
-        levelText.text = "Niv. " + currentLevel;
+        // OPTIMISATION VISUELLE : Empêche l'UI de rebuild si les valeurs sont identiques
+        if (cacheAffichageNiveau != currentLevel)
+        {
+            cacheAffichageNiveau = currentLevel;
+            levelText.text = "Niv. " + currentLevel;
+            
+            // La production ne change qu'aux passages de niveau/multiplicateurs, on update ici
+            double yieldToDisplay = GetActualYield();
+            if (currentLevel == 0) productionText.text = "0 / sec";
+            else
+            {
+                if (currentProductionTime <= 1f) productionText.text = ScoreUI.FormatNumber(yieldToDisplay / currentProductionTime) + " / sec";
+                else if (currentProductionTime < 60f) productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Mathf.RoundToInt(currentProductionTime) + "s";
+                else productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Mathf.RoundToInt(currentProductionTime / 60f) + "m";
+            }
+        }
+
+        string nouveauTexteBouton = "";
         
         if (isFreeUnlock)
         {
-            costText.text = "GRATUIT";
-            if (upgradeButtonText != null) upgradeButtonText.text = "DÉBLOQUER";
+            if (cacheAffichageCout != 0) { costText.text = "GRATUIT"; cacheAffichageCout = 0; }
+            nouveauTexteBouton = "DÉBLOQUER";
         }
         else if (levelsToBuy > 0)
         {
-            costText.text = ScoreUI.FormatNumber(currentCostToBuy);
+            if (cacheAffichageCout != currentCostToBuy) { costText.text = ScoreUI.FormatNumber(currentCostToBuy); cacheAffichageCout = currentCostToBuy; }
             BuyMode mode = BuyModeManager.Instance != null ? BuyModeManager.Instance.currentMode : BuyMode.x1;
-            if (upgradeButtonText != null) 
-                upgradeButtonText.text = (mode == BuyMode.MAX) ? "+MAX (" + levelsToBuy + ")" : "+" + levelsToBuy;
+            nouveauTexteBouton = (mode == BuyMode.MAX) ? "+MAX (" + levelsToBuy + ")" : "+" + levelsToBuy;
         }
         else
         {
             CalculateCostForLevels(currentLevel, 1, discount, out double costForOne);
-            costText.text = ScoreUI.FormatNumber(costForOne);
-            if (upgradeButtonText != null) upgradeButtonText.text = "+1";
+            if (cacheAffichageCout != costForOne) { costText.text = ScoreUI.FormatNumber(costForOne); cacheAffichageCout = costForOne; }
+            nouveauTexteBouton = "+1";
         }
 
-        // --- AFFICHAGE DE LA RENTABILITÉ (DPS) AVEC TEMPS ARRONDIS ---
-        double yieldToDisplay = GetActualYield();
-
-        if (currentLevel == 0) 
+        if (upgradeButtonText != null && cacheAffichageTexteBouton != nouveauTexteBouton)
         {
-            productionText.text = "0 / sec";
-        }
-        else
-        {
-            if (currentProductionTime <= 1f) 
-            {
-                productionText.text = ScoreUI.FormatNumber(yieldToDisplay / currentProductionTime) + " / sec";
-            }
-            else if (currentProductionTime < 60f) 
-            {
-                int tempsArrondi = Mathf.RoundToInt(currentProductionTime);
-                productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + tempsArrondi + "s";
-            }
-            else 
-            {
-                int tempsArrondiMin = Mathf.RoundToInt(currentProductionTime / 60f);
-                productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + tempsArrondiMin + "m";
-            }
+            cacheAffichageTexteBouton = nouveauTexteBouton;
+            upgradeButtonText.text = nouveauTexteBouton;
         }
 
         GameManager.Instance.CalculerDPSGlobal();
@@ -280,7 +272,7 @@ public class UpgradeShopUI : MonoBehaviour
 
     private void CalculateCostForLevels(int startLevel, int levelsToAdd, double discount, out double totalCost)
     {
-        double baseCost = GetDiscountedBaseCost();
+        double baseCost = myFloorData.baseCost * cardDiscount;
         double multiplier = myFloorData.costMultiplier;
         
         if (multiplier <= 1.001)
@@ -298,7 +290,7 @@ public class UpgradeShopUI : MonoBehaviour
     {
         affordableLevels = 0;
         totalCost = 0;
-        double baseCost = GetDiscountedBaseCost();
+        double baseCost = myFloorData.baseCost * cardDiscount;
         double multiplier = myFloorData.costMultiplier;
 
         if (multiplier <= 1.001)
@@ -326,10 +318,5 @@ public class UpgradeShopUI : MonoBehaviour
         if (niveau < 75) return 75;
         if (niveau < 100) return 100;
         return ((niveau / 100) + 1) * 100;
-    }
-
-    void OnDisable()
-    {
-        if (myFloorData != null) PlayerPrefs.SetFloat("FloorTimer_" + myFloorData.name, timer);
     }
 }

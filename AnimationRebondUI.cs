@@ -2,20 +2,33 @@ using UnityEngine;
 
 public class AnimationRebondUI : MonoBehaviour
 {
-    public float scaleSpeed = 5f;
-    public float scaleAmount = 0.05f;
+    [Header("Paramètres de Rebond")]
+    public float vitesse = 5f;
+    public float echelleMax = 1.1f;
+    public float echelleMin = 0.9f;
+    
+    // OPTIMISATION : Mise en cache
+    private RectTransform rectTransform;
+    private Vector3 echelleInitiale;
 
-    private Vector3 startScale;
-
-    private void Start()
+    void Awake()
     {
-        startScale = transform.localScale;
+        rectTransform = GetComponent<RectTransform>();
     }
 
-    private void Update()
+    void OnEnable()
     {
-        // Crée un effet de battement de coeur doux et continu
-        float bounce = Mathf.Sin(Time.time * scaleSpeed) * scaleAmount;
-        transform.localScale = startScale + new Vector3(bounce, bounce, 0);
+        if (rectTransform != null) echelleInitiale = rectTransform.localScale;
+    }
+
+    void Update()
+    {
+        if (rectTransform == null) return;
+
+        // Création d'une boucle mathématique fluide sans Instantiate ni calculs lourds
+        float progression = Mathf.PingPong(Time.unscaledTime * vitesse, 1f);
+        float scaleActuel = Mathf.Lerp(echelleMin, echelleMax, progression);
+        
+        rectTransform.localScale = echelleInitiale * scaleActuel;
     }
 }

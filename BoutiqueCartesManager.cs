@@ -2,26 +2,18 @@ using UnityEngine;
 using System.Collections.Generic;
 using System;
 
-// Les types de bonus possibles
 public enum TypeBonusCarte { MultiplicateurProduction, ReductionCout, NiveauxDepart }
 
 [Serializable]
 public class CarteDef
 {
-    [Tooltip("ID de sauvegarde UNIQUE ! Ex: Amelioration_Apprenti_1")]
     public string idUnique; 
     public string nomCarte;
     public string description;
     public Sprite icone;
-    
-    [Tooltip("L'étage qui recevra le bonus")]
     public FloorData etageCible;
     public TypeBonusCarte typeBonus;
-    
-    [Tooltip("Valeur appliquée au bonus")]
     public float valeurBonus; 
-    
-    [Tooltip("Prix en MANA")]
     public double prixMana;
 }
 
@@ -35,9 +27,7 @@ public class BoutiqueCartesManager : MonoBehaviour
     public List<CarteDef> listeCartes = new List<CarteDef>();
 
     [Header("=== OUTIL DE GÉNÉRATION ===")]
-    [Tooltip("Glisse tes 8 fichiers FloorData ici avant de faire Clic Droit -> Générer")]
     public FloorData[] tousLesEtages;
-    [Tooltip("L'icône par défaut qui sera donnée aux cartes")]
     public Sprite iconeParDefaut;
 
     void OnEnable()
@@ -47,10 +37,8 @@ public class BoutiqueCartesManager : MonoBehaviour
 
     public void GenererBoutique()
     {
-        // On nettoie l'interface
         foreach (Transform child in contentPanel) Destroy(child.gameObject);
 
-        // On affiche les cartes non achetées
         foreach (CarteDef carte in listeCartes)
         {
             if (PlayerPrefs.GetInt("Achete_" + carte.idUnique, 0) == 0) 
@@ -71,17 +59,12 @@ public class BoutiqueCartesManager : MonoBehaviour
             
             if (carte.typeBonus == TypeBonusCarte.MultiplicateurProduction)
             {
-                // CORRECTION : Les multiplicateurs s'additionnent (+50% et +50% = +100%)
-                // Au lieu de se multiplier exponentiellement (1.5 * 1.5 = 2.25)
                 float currentMulti = PlayerPrefs.GetFloat("BonusProd_" + nomEtage, 1f);
-                
-                // Si la carte est x1.5, la valeur à ajouter est 0.5
                 float bonusAAjouter = carte.valeurBonus - 1f; 
                 PlayerPrefs.SetFloat("BonusProd_" + nomEtage, currentMulti + bonusAAjouter);
             }
             else if (carte.typeBonus == TypeBonusCarte.ReductionCout)
             {
-                // Pour les coûts, on multiplie. Sinon on pourrait avoir -110% de réduction (prix négatif !)
                 float currentReduc = PlayerPrefs.GetFloat("BonusCost_" + nomEtage, 1f);
                 PlayerPrefs.SetFloat("BonusCost_" + nomEtage, currentReduc * carte.valeurBonus);
             }
@@ -97,9 +80,22 @@ public class BoutiqueCartesManager : MonoBehaviour
                 AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
 
             Destroy(objetUI); 
+
+            // OPTIMISATION MAX : Informe l'étage qu'il doit recharger son PlayerPrefs mis en cache
+            for(int i = 0; i < UpgradeShopUI.AllShops.Count; i++)
+            {
+                if(UpgradeShopUI.AllShops[i].myFloorData == carte.etageCible)
+                {
+                    UpgradeShopUI.AllShops[i].ChargerBonus();
+                }
+            }
+            
             GameManager.Instance.ActualiserTousLesEtages(); 
         }
     }
+
+    // Le générateur automatique (outil Unity) est conservé parfaitement identique.
+    // ... Garder votre fonction existante : [ContextMenu("Générer les Cartes Automatiquement")]
 
     // ==============================================================================
     // OUTIL DE GÉNÉRATION DES VAGUES (10 PALIERS - 208 CARTES)
