@@ -116,7 +116,7 @@ public class UpgradeShopUI : MonoBehaviour
     {
         if (myFloorData == null || GameManager.Instance == null) return;
 
-        // --- LECTURE DES NIVEAUX DE DÉPART (Bonus Cartes) ---
+        // --- 1. LECTURE DES NIVEAUX DE DÉPART (Bonus Cartes) ---
         int minLevels = PlayerPrefs.GetInt("BonusLevels_" + myFloorData.name, 0);
         if (currentLevel < minLevels) 
         {
@@ -132,6 +132,7 @@ public class UpgradeShopUI : MonoBehaviour
 
         bool isFreeUnlock = (estLePremierEtage && currentLevel == 0);
 
+        // --- 2. GESTION DES COÛTS ET DES MODES D'ACHAT ---
         if (isFreeUnlock)
         {
             levelsToBuy = 1;
@@ -161,30 +162,39 @@ public class UpgradeShopUI : MonoBehaviour
         double baseYield = 0;
         float time = myFloorData.baseProductionTime;
 
+        // --- 3. CALCUL DE LA PRODUCTION ET DU TEMPS ---
         if (currentLevel > 0)
         {
-            // --- LECTURE DU MULTIPLICATEUR DE PRODUCTION (Bonus Cartes) ---
+            // Lecture du multiplicateur de production (Bonus Cartes)
             float cardProdMulti = PlayerPrefs.GetFloat("BonusProd_" + myFloorData.name, 1f);
 
-            // On ajoute le bonus de carte au calcul final !
+            // Calcul de base combinant Niveau + Paliers + Cartes
             baseYield = myFloorData.baseProduction * currentLevel * CalculerMultiplicateurPalier(currentLevel) * cardProdMulti;
 
-            int[] paliers = { 25, 50, 75, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 };
-            foreach (int palier in paliers)
+            // Réduction de temps agressive
+            int[] paliersTemps = { 25, 50, 75, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 900, 1000 };
+            
+            foreach (int palier in paliersTemps)
             {
-                if (currentLevel >= palier) time /= 2f; 
+                if (currentLevel >= palier) 
+                {
+                    if (palier >= 100) time /= 4f; // À partir du niv 100, on divise violemment par 4
+                    else time /= 3f;               // Pour 25, 50 et 75, on divise par 3
+                }
             }
 
-            if (time < 1f && time > 0f)
+            // On bride visuellement à 0.1s (effet "mitraillette") et on convertit l'excédent en Mana brut pour ne rien perdre
+            if (time < 0.1f && time > 0f)
             {
-                baseYield *= (1f / time);
-                time = 1f;
+                baseYield *= (0.1f / time);
+                time = 0.1f;
             }
         }
 
         currentBaseYield = baseYield;
         currentProductionTime = time;
 
+        // --- 4. MISE À JOUR DE L'AFFICHAGE (TEXTES) ---
         levelText.text = "Niv. " + currentLevel;
         
         if (isFreeUnlock)
@@ -206,20 +216,25 @@ public class UpgradeShopUI : MonoBehaviour
             if (upgradeButtonText != null) upgradeButtonText.text = "+1";
         }
 
+        // --- 5. AFFICHAGE DE LA RENTABILITÉ (DPS) ---
         double yieldToDisplay = GetActualYield();
 
         if (currentLevel == 0) 
+        {
             productionText.text = "0 / sec";
+        }
         else
         {
+            // Affiche le vrai DPS calculé correctement, même si la barre descend sous les 1s
             if (currentProductionTime <= 1f) 
-                productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / sec";
+                productionText.text = ScoreUI.FormatNumber(yieldToDisplay / currentProductionTime) + " / sec";
             else if (currentProductionTime < 60f) 
                 productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Math.Round(currentProductionTime, 1) + "s";
             else 
                 productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Math.Round(currentProductionTime / 60f, 1) + "m";
         }
 
+        // --- 6. ON PRÉVIENT LE MOTEUR DU JEU ---
         GameManager.Instance.CalculerDPSGlobal();
     }
 
@@ -286,12 +301,18 @@ public class UpgradeShopUI : MonoBehaviour
     private double CalculerMultiplicateurPalier(int niveau)
     {
         double mult = 1.0;
-        if (niveau >= 25) mult *= 1.5; 
+        
+        // Paliers de base (x2 au lieu de x1.5 pour un meilleur ressenti)
+        if (niveau >= 25) mult *= 2.0; 
+        if (niveau >= 50) mult *= 2.0; 
         if (niveau >= 75) mult *= 2.0; 
+        
+        // Boucle infinie pour le Late-Game
         if (niveau >= 100)
         {
             int centaines = niveau / 100;
-            mult *= Math.Pow(2.0, centaines); 
+            // On booste le late-game : x3 tous les 100 niveaux (au lieu de x2) !
+            mult *= Math.Pow(3.0, centaines); 
         }
         return mult;
     }
