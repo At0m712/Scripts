@@ -1,139 +1,123 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
-using System;
+using UnityEngine.Localization;
 
 public class ArbreCompetences : MonoBehaviour
 {
-    [Header("Texte d'En-tête")]
-    public TextMeshProUGUI cristauxDisponiblesText;
-
-    [Header("Système d'Onglets")]
-    public GameObject panelCartes; // La fenêtre avec la grille de cartes
-    public GameObject panelArbre;  // L'ancienne fenêtre avec les compétences globales
-    public Button ongletCartesBtn;
-    public Button ongletArbreBtn;
-    
-    [Header("Compétence 1 : Réduction de Coût Global")]
-    public int coutReductionLevel = 0;
-    public double coutReductionPriceBase = 10;
-    public TextMeshProUGUI coutReductionLevelText;
-    public TextMeshProUGUI coutReductionPriceText;
-    public Button coutReductionBtn;
-
-    [Header("Compétence 2 : Bonus Production Global")]
-    public int prodBonusLevel = 0;
-    public double prodBonusPriceBase = 25;
+    [Header("UI Production Bonus")]
     public TextMeshProUGUI prodBonusLevelText;
-    public TextMeshProUGUI prodBonusPriceText;
-    public Button prodBonusBtn;
+    public TextMeshProUGUI prodBonusCostText;
+    public Button buyProdBonusButton;
 
-    private double currentCoutReductionPrice;
-    private double currentProdBonusPrice;
+    [Header("UI Cost Reduction")]
+    public TextMeshProUGUI costReducLevelText;
+    public TextMeshProUGUI costReducCostText;
+    public Button buyCostReducButton;
+
+    [Header("Localisation")]
+    public LocalizedString texteNiveauMax; // Clé ex: Niv. {0} / {1}
+    public LocalizedString textePrixCristaux; // Clé ex: {0} Cristaux
+    public LocalizedString texteMaxAtteint; // Clé ex: MAX
+
+    private int prodBonusLevel = 0;
+    private int costReducLevel = 0;
+
+    private int maxProdBonusLevel = 50; 
+    private int maxCostReducLevel = 25; 
 
     void Start()
     {
-        LoadCompetences();
-        
-        if(coutReductionBtn != null) coutReductionBtn.onClick.AddListener(BuyCoutReduction);
-        if(prodBonusBtn != null) prodBonusBtn.onClick.AddListener(BuyProdBonus);
-        
-        // --- GESTION DES ONGLETS ---
-        if(ongletCartesBtn != null) ongletCartesBtn.onClick.AddListener(AfficherOngletCartes);
-        if(ongletArbreBtn != null) ongletArbreBtn.onClick.AddListener(AfficherOngletArbre);
-        
-        AfficherOngletCartes(); // Ouvre les Cartes par défaut !
-        
-        InvokeRepeating(nameof(CheckButtonsState), 0.1f, 0.5f);
+        prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
+        costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
+
+        buyProdBonusButton.onClick.AddListener(BuyProdBonus);
+        buyCostReducButton.onClick.AddListener(BuyCostReduc);
+
+        UpdateUI();
     }
 
-    public void AfficherOngletCartes()
+    void Update()
     {
-        if (panelCartes != null) panelCartes.SetActive(true);
-        if (panelArbre != null) panelArbre.SetActive(false);
-    }
-
-    public void AfficherOngletArbre()
-    {
-        if (panelCartes != null) panelCartes.SetActive(false);
-        if (panelArbre != null) panelArbre.SetActive(true);
-    }
-
-    private void CheckButtonsState()
-    {
-        if (GameManager.Instance == null) return;
-        
-        double cristaux = GameManager.Instance.temporalCrystals;
-        if(coutReductionBtn != null) coutReductionBtn.interactable = (cristaux >= currentCoutReductionPrice);
-        if(prodBonusBtn != null) prodBonusBtn.interactable = (cristaux >= currentProdBonusPrice);
-        
-        MettreAJourEnTete();
-    }
-
-    public void MettreAJourEnTete()
-    {
-        if (cristauxDisponiblesText != null && GameManager.Instance != null)
-            cristauxDisponiblesText.text = "Cristaux : " + GameManager.Instance.temporalCrystals;
-    }
-
-    private double GetPrice(double basePrice, int level)
-    {
-        return Math.Floor(basePrice * Math.Pow(1.5f, level)); 
-    }
-
-    public void BuyCoutReduction()
-    {
-        if (GameManager.Instance.temporalCrystals >= currentCoutReductionPrice)
+        // Mise à jour des boutons en temps réel selon les cristaux
+        if (GameManager.Instance != null)
         {
-            GameManager.Instance.temporalCrystals -= (int)currentCoutReductionPrice;
-            coutReductionLevel++;
-            SaveCompetences();
-            
-            if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
-                AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+            buyProdBonusButton.interactable = (prodBonusLevel < maxProdBonusLevel) && (GameManager.Instance.temporalCrystals >= GetProdBonusCost());
+            buyCostReducButton.interactable = (costReducLevel < maxCostReducLevel) && (GameManager.Instance.temporalCrystals >= GetCostReducCost());
+        }
+    }
+
+    private int GetProdBonusCost() { return 5 * (prodBonusLevel + 1); }
+    private int GetCostReducCost() { return 10 * (costReducLevel + 1); }
+
+    private void UpdateUI()
+    {
+        // LOCALISATION BONUS PRODUCTION
+        texteNiveauMax.Arguments = new object[] { prodBonusLevel, maxProdBonusLevel };
+        prodBonusLevelText.text = texteNiveauMax.GetLocalizedString();
+
+        if (prodBonusLevel < maxProdBonusLevel)
+        {
+            textePrixCristaux.Arguments = new object[] { GetProdBonusCost() };
+            prodBonusCostText.text = textePrixCristaux.GetLocalizedString();
+        }
+        else
+        {
+            prodBonusCostText.text = texteMaxAtteint.GetLocalizedString();
+        }
+
+        // LOCALISATION RÉDUCTION DE COÛT
+        texteNiveauMax.Arguments = new object[] { costReducLevel, maxCostReducLevel };
+        costReducLevelText.text = texteNiveauMax.GetLocalizedString();
+
+        if (costReducLevel < maxCostReducLevel)
+        {
+            textePrixCristaux.Arguments = new object[] { GetCostReducCost() };
+            costReducCostText.text = textePrixCristaux.GetLocalizedString();
+        }
+        else
+        {
+            costReducCostText.text = texteMaxAtteint.GetLocalizedString();
         }
     }
 
     public void BuyProdBonus()
     {
-        if (GameManager.Instance.temporalCrystals >= currentProdBonusPrice)
+        int cost = GetProdBonusCost();
+        if (GameManager.Instance.temporalCrystals >= cost && prodBonusLevel < maxProdBonusLevel)
         {
-            GameManager.Instance.temporalCrystals -= (int)currentProdBonusPrice;
+            GameManager.Instance.temporalCrystals -= cost;
             prodBonusLevel++;
-            SaveCompetences();
+            PlayerPrefs.SetInt("Arbre_ProdBonus", prodBonusLevel);
+            PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
             
-            if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
-                AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+            FinaliserAchat();
         }
     }
 
-    private void SaveCompetences()
+    public void BuyCostReduc()
     {
-        PlayerPrefs.SetInt("Arbre_CostReduc", coutReductionLevel);
-        PlayerPrefs.SetInt("Arbre_ProdBonus", prodBonusLevel);
+        int cost = GetCostReducCost();
+        if (GameManager.Instance.temporalCrystals >= cost && costReducLevel < maxCostReducLevel)
+        {
+            GameManager.Instance.temporalCrystals -= cost;
+            costReducLevel++;
+            PlayerPrefs.SetInt("Arbre_CostReduc", costReducLevel);
+            PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
+            
+            FinaliserAchat();
+        }
+    }
+
+    private void FinaliserAchat()
+    {
         PlayerPrefs.Save();
-        
-        GameManager.Instance.RecalculateMultiplier(); 
+        GameManager.Instance.RecalculateMultiplier();
+        GameManager.Instance.ActualiserTousLesEtages();
+
+        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+
         UpdateUI();
-        CheckButtonsState();
-    }
-
-    private void LoadCompetences()
-    {
-        coutReductionLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
-        prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
-        UpdateUI();
-    }
-
-    public void UpdateUI()
-    {
-        currentCoutReductionPrice = GetPrice(coutReductionPriceBase, coutReductionLevel);
-        currentProdBonusPrice = GetPrice(prodBonusPriceBase, prodBonusLevel);
-
-        if(coutReductionLevelText != null) coutReductionLevelText.text = "Niveau " + coutReductionLevel;
-        if(coutReductionPriceText != null) coutReductionPriceText.text = currentCoutReductionPrice + " Cristaux";
-        
-        if(prodBonusLevelText != null) prodBonusLevelText.text = "Niveau " + prodBonusLevel;
-        if(prodBonusPriceText != null) prodBonusPriceText.text = currentProdBonusPrice + " Cristaux";
     }
 }

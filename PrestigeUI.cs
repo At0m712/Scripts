@@ -1,110 +1,93 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
-using System;
 using UnityEngine.SceneManagement;
+using UnityEngine.Localization;
 
 public class PrestigeUI : MonoBehaviour
 {
-    [Header("Textes UI")]
-    public TextMeshProUGUI cristauxPossedesText;
+    [Header("UI Elements")]
     public TextMeshProUGUI cristauxGagnesText;
-    public TextMeshProUGUI prochainCristalText; 
-    public TextMeshProUGUI bonusActuelText;
-    public Button boutonPrestige;
+    public TextMeshProUGUI multiplicateurText;
+    public Button prestigeButton;
 
-    private double multiplicateurGagne = 0;
-    private int cristauxGagnes = 0;
-    private double baseRequis = 1000000; 
+    [Header("Localisation")]
+    public LocalizedString texteGainCristaux; // Clé ex: +{0} Cristaux
+    public LocalizedString texteMultiplicateur; // Clé ex: Bonus x{0}
+    public LocalizedString texteTropTot; // Clé ex: Reviens plus tard !
 
-    private double cacheManaTotal = -1;
-
-    void OnEnable()
-    {
-        if (boutonPrestige != null)
-        {
-            boutonPrestige.onClick.RemoveAllListeners();
-            boutonPrestige.onClick.AddListener(ValiderPrestige);
-        }
-        MettreAJourAffichage(true);
-    }
+    private int cristauxGagnes;
+    private double multiplicateurGagne;
 
     void Update()
     {
         if (GameManager.Instance == null) return;
+
+        // Calcul des gains de prestige (basé sur le Mana Total Produit)
+        double totalMana = GameManager.Instance.manaTotalProduced;
         
-        // OPTIMISATION MAX : On ne fait les calculs mathématiques et d'affichage que si l'argent total du joueur a monté !
-        if (cacheManaTotal != GameManager.Instance.manaTotalProduced)
+        // Formule classique : Racine cubique des milliards générés
+        if (totalMana > 1000000)
         {
-            cacheManaTotal = GameManager.Instance.manaTotalProduced;
-            MettreAJourAffichage(false);
+            cristauxGagnes = (int)(Mathf.Pow((float)(totalMana / 1000000), 0.33f));
+            multiplicateurGagne = cristauxGagnes * 0.1; // Chaque cristal donne +10%
         }
-    }
-
-    private void MettreAJourAffichage(bool forcer)
-    {
-        double manaTotal = GameManager.Instance.manaTotalProduced;
-        double multiActuel = GameManager.Instance.prestigeMultiplier;
-        double seuilPrestige = baseRequis * multiActuel;
-
-        if (manaTotal >= seuilPrestige)
+        else
         {
-            double ratio = manaTotal / seuilPrestige;
-            multiplicateurGagne = 4.0 * Math.Pow(ratio, 0.4f);
-        }
-        else multiplicateurGagne = 0;
-
-        double affichageGain = (multiplicateurGagne < 4.0 && manaTotal >= seuilPrestige) ? 4.0 : multiplicateurGagne;
-        cristauxGagnes = (int)Math.Floor(Math.Sqrt(manaTotal / 100000.0));
-
-        if (cristauxPossedesText != null) cristauxPossedesText.text = "Multiplicateur Global : X" + multiActuel.ToString("F1");
-
-        if (cristauxGagnesText != null)
-        {
-            if (multiplicateurGagne > 0) cristauxGagnesText.text = "<color=#FFD700>GAIN : +X" + multiplicateurGagne.ToString("F1") + "</color>\n<size=50%>(et +" + cristauxGagnes + " Cristaux)</size>";
-            else cristauxGagnesText.text = "PAS ASSEZ DE MANA";
+            cristauxGagnes = 0;
+            multiplicateurGagne = 0;
         }
 
-        if (prochainCristalText != null)
+        // --- LOCALISATION ---
+        if (multiplicateurGagne >= 4.0)
         {
-            if (manaTotal < seuilPrestige) prochainCristalText.text = "Requis pour un bonus rentable : " + ScoreUI.FormatNumber(seuilPrestige - manaTotal) + " Mana";
-            else prochainCristalText.text = "Plus vous attendez, plus le X monte !";
-        }
+            prestigeButton.interactable = true;
+            
+            texteGainCristaux.Arguments = new object[] { ScoreUI.FormatNumber(cristauxGagnes) };
+            if (cristauxGagnesText != null) cristauxGagnesText.text = texteGainCristaux.GetLocalizedString();
 
-        if (bonusActuelText != null)
+            texteMultiplicateur.Arguments = new object[] { multiplicateurGagne.ToString("F2") };
+            if (multiplicateurText != null) multiplicateurText.text = texteMultiplicateur.GetLocalizedString();
+        }
+        else
         {
-            double futurMulti = multiActuel + multiplicateurGagne;
-            bonusActuelText.text = "Multiplicateur après prestige : X" + futurMulti.ToString("F1");
+            prestigeButton.interactable = false;
+            if (cristauxGagnesText != null) cristauxGagnesText.text = texteTropTot.GetLocalizedString();
+            if (multiplicateurText != null) multiplicateurText.text = "";
         }
-
-        if (boutonPrestige != null) boutonPrestige.interactable = (multiplicateurGagne >= 4.0); 
     }
 
     public void ValiderPrestige()
     {
         if (multiplicateurGagne < 4.0) return;
 
+        // 1. Gain des ressources
         GameManager.Instance.prestigeMultiplier += multiplicateurGagne;
         GameManager.Instance.temporalCrystals += cristauxGagnes;
         PlayerPrefs.SetString("prestigeMultiplier", GameManager.Instance.prestigeMultiplier.ToString());
 
+        // 2. Reset du Mana
         GameManager.Instance.manaCurrent = 0;
         GameManager.Instance.manaTotalProduced = 0;
         GameManager.Instance.manaPerSecond = 0;
 
+        // 3. Reset des Cartes de la boutique
         BoutiqueCartesManager[] managers = Resources.FindObjectsOfTypeAll<BoutiqueCartesManager>();
         if (managers.Length > 0)
         {
-            foreach (CarteDef carte in managers[0].listeCartes) PlayerPrefs.DeleteKey("Achete_" + carte.idUnique);
+            foreach (CarteDef carte in managers[0].listeCartes)
+            {
+                PlayerPrefs.DeleteKey("Achete_" + carte.idUnique);
+            }
         }
 
-        // OPTIMISATION MAX : Utilisation de la liste rapide
-        for(int i = 0; i < UpgradeShopUI.AllShops.Count; i++)
+        // 4. Reset des étages
+        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
+        foreach (var etage in tousLesEtages)
         {
-            UpgradeShopUI etage = UpgradeShopUI.AllShops[i];
             string nomEtage = etage.myFloorData.name;
-
             int minLevels = PlayerPrefs.GetInt("BonusLevels_" + nomEtage, 0);
+            
             etage.currentLevel = minLevels;
             PlayerPrefs.SetInt("FloorLevel_" + nomEtage, minLevels);
             PlayerPrefs.SetFloat("FloorTimer_" + nomEtage, 0f); 
@@ -119,7 +102,11 @@ public class PrestigeUI : MonoBehaviour
         PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
         PlayerPrefs.Save();
 
-        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null) AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+        {
+            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+        }
+
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

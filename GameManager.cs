@@ -1,5 +1,5 @@
 using UnityEngine;
-using System; 
+using System;
 
 public class GameManager : MonoBehaviour
 {
@@ -11,77 +11,56 @@ public class GameManager : MonoBehaviour
     public double manaPerSecond = 0;
     public int temporalCrystals = 0;
 
-    [Header("Multiplicateurs")]
+    [Header("Multiplicateurs Globaux")]
     public double globalMultiplier = 1.0;
     public double adBoostMultiplier = 1.0;
-    public double prestigeMultiplier = 1.0; 
+    public double prestigeMultiplier = 1.0;
     public float adBoostTimer = 0f;
     public float costReductionBonus = 0f;
+
+    [Header("Surcharge Temporelle (Rush)")]
     public double rushMultiplier = 10.0;
     public bool IsRushActive = false;
 
-    private float rushTimer = 0f;
-
     void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
-
-        manaPerSecond = 0;
-        
-        if (PlayerPrefs.HasKey("prestigeMultiplier"))
+        if (Instance == null)
         {
-            double.TryParse(PlayerPrefs.GetString("prestigeMultiplier", "1"), out prestigeMultiplier);
+            Instance = this;
         }
-        if (prestigeMultiplier < 1.0) prestigeMultiplier = 1.0;
+        else
+        {
+            Destroy(gameObject);
+        }
     }
 
     void Start()
     {
-        string dateFinString = PlayerPrefs.GetString("dateFinMultiplicateur", "");
-        if (!string.IsNullOrEmpty(dateFinString) && DateTime.TryParse(dateFinString, out DateTime finBonus))
-        {
-            if (finBonus > DateTime.Now)
-            {
-                adBoostMultiplier = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
-                adBoostTimer = (float)(finBonus - DateTime.Now).TotalSeconds;
-            }
-            else
-            {
-                PlayerPrefs.SetInt("multiplicateurArgentActuel", 1);
-                adBoostMultiplier = 1.0;
-                adBoostTimer = 0f;
-            }
-        }
+        ChargerSauvegardeBasique();
         RecalculateMultiplier();
     }
 
     void Update()
     {
+        // Gestion du chrono de la publicité
         if (adBoostTimer > 0)
         {
             adBoostTimer -= Time.deltaTime;
             if (adBoostTimer <= 0)
             {
                 adBoostTimer = 0;
-                adBoostMultiplier = 1.0; 
+                adBoostMultiplier = 1.0;
                 ActualiserTousLesEtages();
-            }
-        }
-
-        if (IsRushActive)
-        {
-            rushTimer -= Time.deltaTime;
-            if (rushTimer <= 0)
-            {
-                IsRushActive = false;
-                CalculerDPSGlobal(); 
             }
         }
     }
 
+    // ==========================================
+    // 💰 GESTION DU MANA
+    // ==========================================
     public void AddMana(double amount)
     {
+        if (amount <= 0) return;
         manaCurrent += amount;
         manaTotalProduced += amount;
     }
@@ -96,45 +75,83 @@ public class GameManager : MonoBehaviour
         return false;
     }
 
-    public void ActivateRush(float duration)
-    {
-        IsRushActive = true;
-        rushTimer = duration;
-        CalculerDPSGlobal(); 
-    }
-
-    public void RecalculateMultiplier()
-    {
-        int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
-        int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
-
-        double bonusCristauxPassif = temporalCrystals * 0.02;
-        double baseMulti = 1.0 + (prodBonusLevel * 0.05); 
-        
-        globalMultiplier = (baseMulti + bonusCristauxPassif) * prestigeMultiplier; 
-        costReductionBonus = Mathf.Min(0.50f, costReducLevel * 0.02f); 
-    }
-
+    // ==========================================
+    // 🔄 ACTUALISATION DES ÉTAGES
+    // ==========================================
+    
+    // Remplace l'ancien "UpgradeShopUI.AllShops"
     public void CalculerDPSGlobal()
     {
-        double totalDPS = 0;
-        // OPTIMISATION MAX : On utilise la liste statique au lieu d'utiliser FindObjectsOfType
-        for (int i = 0; i < UpgradeShopUI.AllShops.Count; i++)
+        double newDPS = 0;
+        
+        // On trouve tous les étages actifs dans la scène
+        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
+        
+        foreach (var etage in tousLesEtages)
         {
-            if (UpgradeShopUI.AllShops[i].currentLevel > 0)
-            {
-                totalDPS += UpgradeShopUI.AllShops[i].ObtenirDPS();
-            }
+            newDPS += etage.ObtenirDPS();
         }
-        manaPerSecond = totalDPS;
+        
+        manaPerSecond = newDPS;
     }
 
     public void ActualiserTousLesEtages()
     {
-        // OPTIMISATION MAX
-        for (int i = 0; i < UpgradeShopUI.AllShops.Count; i++)
+        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
+        
+        foreach (var etage in tousLesEtages)
         {
-            UpgradeShopUI.AllShops[i].RecalculerStats();
+            etage.RecalculerStats();
         }
+    }
+
+    // ==========================================
+    // ⚙️ GESTION DES MULTIPLICATEURS ET ARBRE
+    // ==========================================
+    public void RecalculateMultiplier()
+    {
+        // 1. Calcul du Prestige
+        if (PlayerPrefs.HasKey("prestigeMultiplier"))
+        {
+            string savedPrestige = PlayerPrefs.GetString("prestigeMultiplier", "1");
+            double.TryParse(savedPrestige, out prestigeMultiplier);
+            if (prestigeMultiplier < 1.0) prestigeMultiplier = 1.0;
+        }
+        
+        // 2. Calcul du Bonus de Production Global (Arbre de compétences)
+        int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
+        
+        // La formule : Prestige + (Niveau Arbre * 10%)
+        globalMultiplier = prestigeMultiplier + (prodBonusLevel * 0.10); 
+        
+        // 3. Calcul de la Réduction de Coût (Arbre de compétences)
+        int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
+        
+        // La formule : Niveau Arbre * 2% de réduction (max limité pour éviter le gratuit)
+        costReductionBonus = costReducLevel * 0.02f; 
+        if (costReductionBonus > 0.90f) costReductionBonus = 0.90f; 
+        
+        CalculerDPSGlobal();
+        ActualiserTousLesEtages();
+    }
+
+    // ==========================================
+    // 💾 SAUVEGARDE BASIQUE (En soutien du SaveManager)
+    // ==========================================
+    private void ChargerSauvegardeBasique()
+    {
+        if (PlayerPrefs.HasKey("manaCurrent"))
+        {
+            string savedMana = PlayerPrefs.GetString("manaCurrent", "0");
+            double.TryParse(savedMana, out manaCurrent);
+        }
+        
+        if (PlayerPrefs.HasKey("manaTotalProduced"))
+        {
+            string savedTotal = PlayerPrefs.GetString("manaTotalProduced", "0");
+            double.TryParse(savedTotal, out manaTotalProduced);
+        }
+        
+        temporalCrystals = PlayerPrefs.GetInt("temporalCrystals", 0);
     }
 }

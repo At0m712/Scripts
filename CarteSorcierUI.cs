@@ -1,6 +1,7 @@
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
+using UnityEngine.Localization;
 
 public class CarteSorcierUI : MonoBehaviour
 {
@@ -11,21 +12,54 @@ public class CarteSorcierUI : MonoBehaviour
     public TextMeshProUGUI prixText;
     public Button boutonAchat;
 
+    [Header("Localisation des Descriptions")]
+    public LocalizedString texteDescProduction; // Clé ex: Production x{0}
+    public LocalizedString texteDescCout;       // Clé ex: Prix -{0}%
+    public LocalizedString texteDescNiveau;     // Clé ex: Démarre Niv. {0}
+    public LocalizedString textePrixMana;       // Clé ex: {0} Mana
+
     private CarteDef maCarte;
     private BoutiqueCartesManager monManager;
 
-    // Rempli automatiquement par le Manager
     public void Configurer(CarteDef carte, BoutiqueCartesManager manager)
     {
         maCarte = carte;
         monManager = manager;
 
         if (iconeObjet != null && carte.icone != null) iconeObjet.sprite = carte.icone;
+        
+        // Le nom peut rester celui généré car c'est un nom propre
         if (titreText != null) titreText.text = carte.nomCarte;
-        if (descriptionText != null) descriptionText.text = carte.description;
-        if (prixText != null) prixText.text = ScoreUI.FormatNumber(carte.prixMana) + " Mana";
 
-        // Nettoie et connecte le bouton
+        // --- MAGIE DE LA LOCALISATION DYNAMIQUE ---
+        // On n'utilise plus la description en dur générée, on la recrée proprement dans la langue du joueur !
+        if (descriptionText != null)
+        {
+            if (carte.typeBonus == TypeBonusCarte.MultiplicateurProduction)
+            {
+                texteDescProduction.Arguments = new object[] { carte.valeurBonus.ToString("F2") };
+                descriptionText.text = texteDescProduction.GetLocalizedString();
+            }
+            else if (carte.typeBonus == TypeBonusCarte.ReductionCout)
+            {
+                int pourcentageSoustrait = Mathf.RoundToInt((1f - carte.valeurBonus) * 100f);
+                texteDescCout.Arguments = new object[] { pourcentageSoustrait };
+                descriptionText.text = texteDescCout.GetLocalizedString();
+            }
+            else if (carte.typeBonus == TypeBonusCarte.NiveauxDepart)
+            {
+                texteDescNiveau.Arguments = new object[] { carte.valeurBonus };
+                descriptionText.text = texteDescNiveau.GetLocalizedString();
+            }
+        }
+
+        // Localisation du prix
+        if (prixText != null) 
+        {
+            textePrixMana.Arguments = new object[] { ScoreUI.FormatNumber(carte.prixMana) };
+            prixText.text = textePrixMana.GetLocalizedString();
+        }
+
         if (boutonAchat != null)
         {
             boutonAchat.onClick.RemoveAllListeners();
@@ -35,7 +69,6 @@ public class CarteSorcierUI : MonoBehaviour
 
     void Update()
     {
-        // Grise le bouton si pas assez de Mana
         if (GameManager.Instance != null && boutonAchat != null)
         {
             boutonAchat.interactable = (GameManager.Instance.manaCurrent >= maCarte.prixMana);
@@ -44,7 +77,6 @@ public class CarteSorcierUI : MonoBehaviour
 
     private void Acheter()
     {
-        // Envoie l'ordre d'achat au grand Manager
         monManager.AcheterCarte(maCarte, this.gameObject);
     }
 }

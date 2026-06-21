@@ -1,61 +1,69 @@
 using UnityEngine;
-using TMPro;
 using UnityEngine.UI;
+using TMPro;
 using System;
+using UnityEngine.Localization;
 
 public class BoutonMultiplicateurUI : MonoBehaviour
 {
-    [Header("Éléments du Bouton")]
-    public TextMeshProUGUI texteChrono; 
-    public Image jaugeTemps; 
+    [Header("UI Elements")]
+    public TextMeshProUGUI texteChrono;
+    public Image jaugeTemps;
     public TextMeshProUGUI texteNiveau; 
+    public GameObject visuelInactif;
+    public GameObject visuelActif;
 
-    [Header("Visuels d'état")]
-    public GameObject visuelInactif; 
-    public GameObject visuelActif; 
+    [Header("Localisation")]
+    public LocalizedString texteMultiplicateurActif; // Clé ex: {0}X
+    public LocalizedString texteBoostPret;           // Clé ex: BOOST PUB
 
-    private const float TEMPS_MAX_SECONDES = 3600f; 
-    private int cacheSecondes = -1;
+    // Note : Ajuste cette valeur selon la durée max de ton boost (ex: 14400 = 4 heures)
+    private float dureeMaxBoost = 14400f; 
 
     void Update()
     {
-        SynchroniserBouton();
-    }
-
-    private void SynchroniserBouton()
-    {
         if (GameManager.Instance == null) return;
 
-        float tempsRestantSec = GameManager.Instance.adBoostTimer;
-        int multi = (int)GameManager.Instance.adBoostMultiplier;
-        bool isActif = tempsRestantSec > 0;
-        int secActuelles = (int)tempsRestantSec;
-
-        // Mise à jour uniquement 1 fois par seconde ou au changement d'état !
-        if (cacheSecondes != secActuelles)
+        // SI LE BOOST EST ACTIF
+        if (GameManager.Instance.adBoostTimer > 0)
         {
-            cacheSecondes = secActuelles;
+            if (visuelActif != null) visuelActif.SetActive(true);
+            if (visuelInactif != null) visuelInactif.SetActive(false);
 
-            if (texteChrono != null)
+            // Formatage du chrono en HH:MM:SS
+            TimeSpan timeSpan = TimeSpan.FromSeconds(GameManager.Instance.adBoostTimer);
+            if (texteChrono != null) 
             {
-                if (isActif)
-                {
-                    TimeSpan ts = TimeSpan.FromSeconds(secActuelles);
-                    texteChrono.text = string.Format("{0:D2}:{1:D2}:{2:D2}", ts.Hours, ts.Minutes, ts.Seconds);
-                }
-                else texteChrono.text = "OFF"; 
+                texteChrono.text = string.Format("{0:D2}:{1:D2}:{2:D2}", timeSpan.Hours, timeSpan.Minutes, timeSpan.Seconds);
             }
-
-            if (jaugeTemps != null)
-            {
-                float ratioTemps = tempsRestantSec / TEMPS_MAX_SECONDES;
-                jaugeTemps.fillAmount = isActif ? Mathf.Clamp01(ratioTemps) : 0f;
-            }
-
-            if (texteNiveau != null) texteNiveau.text = multi + "X"; 
             
-            if (visuelInactif != null && visuelInactif.activeSelf == isActif) visuelInactif.SetActive(!isActif);
-            if (visuelActif != null && visuelActif.activeSelf != isActif) visuelActif.SetActive(isActif);
+            // Jauge visuelle
+            if (jaugeTemps != null) 
+            {
+                jaugeTemps.fillAmount = (float)(GameManager.Instance.adBoostTimer / dureeMaxBoost); 
+            }
+
+            // Localisation du texte (ex: "4X")
+            if (texteNiveau != null)
+            {
+                texteMultiplicateurActif.Arguments = new object[] { GameManager.Instance.adBoostMultiplier };
+                texteNiveau.text = texteMultiplicateurActif.GetLocalizedString();
+            }
+        }
+        // SI LE BOOST EST TERMINÉ / INACTIF
+        else
+        {
+            if (visuelActif != null) visuelActif.SetActive(false);
+            if (visuelInactif != null) visuelInactif.SetActive(true);
+
+            if (texteChrono != null) texteChrono.text = "";
+            if (jaugeTemps != null) jaugeTemps.fillAmount = 0;
+            
+            // Localisation du bouton prêt
+            if (texteNiveau != null) 
+            {
+                texteNiveau.text = texteBoostPret.GetLocalizedString();
+            }
         }
     }
 }
