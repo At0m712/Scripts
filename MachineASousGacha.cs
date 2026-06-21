@@ -80,13 +80,13 @@ public class MachineASousGacha : MonoBehaviour
         if (randomChance < 50) 
         {
             // 50% de chance : FIOLLE DE MANA (Inventaire)
-            InventaireUI.AjouterPotionMana(1);
+            InventaireUI.AjouterObjet("Inv_PotionMana1H", 1);
             rewardPopupText.text = "GAIN : FIOLLE DE MANA\n(Ajouté à votre inventaire !)";
         }
         else if (randomChance < 80) 
         {
             // 30% de chance : BOOST DE VITESSE (Inventaire)
-            InventaireUI.AjouterBoostVitesse(1);
+            InventaireUI.AjouterObjet("Inv_BoostVitesse2H", 1);
             rewardPopupText.text = "JACKPOT !\nBOOST DE VITESSE (2H)\n(Ajouté à votre inventaire !)";
         }
         else 

@@ -103,33 +103,61 @@ public class PrestigeUI : MonoBehaviour
     {
         if (multiplicateurGagne < 4.0) return;
 
+        // 1. On donne les Cristaux et le Multiplicateur au joueur
         GameManager.Instance.prestigeMultiplier += multiplicateurGagne;
         GameManager.Instance.temporalCrystals += cristauxGagnes;
-
         PlayerPrefs.SetString("prestigeMultiplier", GameManager.Instance.prestigeMultiplier.ToString());
 
+        // 2. On remet la monnaie à Zéro
         GameManager.Instance.manaCurrent = 0;
         GameManager.Instance.manaTotalProduced = 0;
         GameManager.Instance.manaPerSecond = 0;
 
+        // 3. RÉINITIALISATION DES CARTES DANS LA BOUTIQUE
+        // On cherche le manager de cartes (même si la fenêtre est fermée/désactivée)
+        BoutiqueCartesManager[] managers = Resources.FindObjectsOfTypeAll<BoutiqueCartesManager>();
+        if (managers.Length > 0)
+        {
+            foreach (CarteDef carte in managers[0].listeCartes)
+            {
+                // On efface la sauvegarde "Acheté" pour que la carte réapparaisse
+                PlayerPrefs.DeleteKey("Achete_" + carte.idUnique);
+            }
+        }
+
+        // 4. RÉINITIALISATION DES ÉTAGES ET DES BONUS
         UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
         foreach (var etage in tousLesEtages)
         {
-            etage.currentLevel = 0;
-            PlayerPrefs.SetInt("FloorLevel_" + etage.myFloorData.name, 0);
-            PlayerPrefs.SetFloat("FloorTimer_" + etage.myFloorData.name, 0f); 
+            string nomEtage = etage.myFloorData.name;
+
+            // A. On lit le bonus de Niveaux de Départ (s'il en a acheté un lors de la partie précédente)
+            int minLevels = PlayerPrefs.GetInt("BonusLevels_" + nomEtage, 0);
+            
+            // B. On applique ce niveau de départ pour la nouvelle partie
+            etage.currentLevel = minLevels;
+            PlayerPrefs.SetInt("FloorLevel_" + nomEtage, minLevels);
+            PlayerPrefs.SetFloat("FloorTimer_" + nomEtage, 0f); 
+
+            // C. On DETRUIT tous les bonus de cartes de cet étage !
+            PlayerPrefs.DeleteKey("BonusProd_" + nomEtage);
+            PlayerPrefs.DeleteKey("BonusCost_" + nomEtage);
+            PlayerPrefs.DeleteKey("BonusLevels_" + nomEtage);
         }
 
+        // 5. Sauvegarde globale
         PlayerPrefs.SetString("manaCurrent", "0");
         PlayerPrefs.SetString("manaTotalProduced", "0");
         PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
         PlayerPrefs.Save();
 
+        // 6. Audio et Redémarrage
         if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
         {
             AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
         }
 
+        // On recharge la scène : les étages liront leurs nouveaux niveaux, et la boutique sera de nouveau pleine !
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }

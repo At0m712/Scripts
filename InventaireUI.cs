@@ -1,98 +1,125 @@
 using UnityEngine;
-using TMPro;
-using UnityEngine.UI;
+using System.Collections.Generic;
+using System;
+
+public enum ItemType { PotionMana, BoostVitesse }
+
+// Cette classe définit ce qu'est un objet (nom, icone, type, durée...)
+[Serializable]
+public class ItemDef
+{
+    [Tooltip("L'ID unique pour la sauvegarde (ex: Inv_Potion1H)")]
+    public string idPrefs; 
+    public string nom;
+    public Sprite icone;
+    public ItemType type;
+    [Tooltip("La puissance de l'objet en heures (1, 2, 4, etc.)")]
+    public float heures; 
+}
 
 public class InventaireUI : MonoBehaviour
 {
-    [Header("Potion de Mana (1H de Prod)")]
-    public TextMeshProUGUI potionManaCountText;
-    public Button utiliserPotionManaBtn;
+    [Header("Configuration")]
+    public GameObject slotPrefab;      // Ton nouveau Prefab Carte_Potion
+    public Transform contentPanel;     // Ton objet Content (qui a le GridLayout)
 
-    [Header("Boost de Vitesse (2H x2)")]
-    public TextMeshProUGUI boostVitesseCountText;
-    public Button utiliserBoostVitesseBtn;
+    [Header("Base de données des Objets")]
+    public List<ItemDef> baseDeDonneesObjets = new List<ItemDef>();
 
-    void Start()
-    {
-        if (utiliserPotionManaBtn != null) utiliserPotionManaBtn.onClick.AddListener(UtiliserPotionMana);
-        if (utiliserBoostVitesseBtn != null) utiliserBoostVitesseBtn.onClick.AddListener(UtiliserBoostVitesse);
-    }
-
-    // OnEnable se déclenche à chaque fois que la fenêtre d'inventaire s'ouvre !
     void OnEnable()
     {
         UpdateUI();
     }
 
+    void Update()
+    {
+        // Optionnel : Actualiser les textes de description en direct si la production de mana augmente pendant qu'on regarde l'inventaire
+        if (Time.frameCount % 60 == 0) // On le fait toutes les secondes pour optimiser
+        {
+            UpdateUI();
+        }
+    }
+
     public void UpdateUI()
     {
-        int potionsMana = PlayerPrefs.GetInt("Inv_PotionMana", 0);
-        int boostsVitesse = PlayerPrefs.GetInt("Inv_BoostVitesse", 0);
-
-        if (potionManaCountText != null) potionManaCountText.text = "x" + potionsMana;
-        if (boostVitesseCountText != null) boostVitesseCountText.text = "x" + boostsVitesse;
-
-        // On grise le bouton si le joueur n'a pas l'objet
-        if (utiliserPotionManaBtn != null) utiliserPotionManaBtn.interactable = (potionsMana > 0);
-        if (utiliserBoostVitesseBtn != null) utiliserBoostVitesseBtn.interactable = (boostsVitesse > 0);
-    }
-
-    public void UtiliserPotionMana()
-    {
-        int potions = PlayerPrefs.GetInt("Inv_PotionMana", 0);
-        if (potions > 0 && GameManager.Instance != null)
+        // 1. On détruit toutes les cases actuellement affichées
+        foreach (Transform child in contentPanel)
         {
-            // 1. On retire l'objet
-            potions--;
-            PlayerPrefs.SetInt("Inv_PotionMana", potions);
-            PlayerPrefs.Save();
+            Destroy(child.gameObject);
+        }
+
+        // 2. On scanne la base de données
+        foreach (ItemDef item in baseDeDonneesObjets)
+        {
+            int quantite = PlayerPrefs.GetInt(item.idPrefs, 0);
             
-            // 2. On donne la récompense (1 heure de prod)
-            double reward = GameManager.Instance.manaPerSecond * 3600;
-            GameManager.Instance.AddMana(reward);
-
-            // 3. Effets
-            if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
-                AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
-
-            UpdateUI();
+            // Si le joueur possède au moins 1 exemplaire, on fabrique la case !
+            if (quantite > 0)
+            {
+                GameObject nouveauSlot = Instantiate(slotPrefab, contentPanel);
+                SlotInventaireUI slotUI = nouveauSlot.GetComponent<SlotInventaireUI>();
+                if (slotUI != null)
+                {
+                    slotUI.Configurer(item, quantite, this);
+                }
+            }
         }
     }
 
-    public void UtiliserBoostVitesse()
+    public void Utiliser(ItemDef item)
     {
-        int boosts = PlayerPrefs.GetInt("Inv_BoostVitesse", 0);
-        if (boosts > 0 && GameManager.Instance != null)
+        int quantite = PlayerPrefs.GetInt(item.idPrefs, 0);
+        if (quantite <= 0) return;
+
+        // 1. Retirer 1 objet de l'inventaire
+        PlayerPrefs.SetInt(item.idPrefs, quantite - 1);
+
+        // 2. Appliquer les effets
+        if (item.type == ItemType.PotionMana)
         {
-            // 1. On retire l'objet
-            boosts--;
-            PlayerPrefs.SetInt("Inv_BoostVitesse", boosts);
-            PlayerPrefs.Save();
-            
-            // 2. On donne la récompense (2 heures de x2)
-            GameManager.Instance.adBoostTimer += 7200f; 
-
-            // 3. Effets
-            if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
-                AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
-
-            UpdateUI();
+            if (GameManager.Instance != null)
+            {
+                double reward = GameManager.Instance.manaPerSecond * 3600 * item.heures;
+                GameManager.Instance.AddMana(reward);
+            }
         }
-    }
-    
-    // --- FONCTIONS STATIQUES POUR LE GACHA ---
-    // Ces fonctions permettent au Gacha d'ajouter des objets à l'inventaire facilement
-    public static void AjouterPotionMana(int quantite)
-    {
-        int current = PlayerPrefs.GetInt("Inv_PotionMana", 0);
-        PlayerPrefs.SetInt("Inv_PotionMana", current + quantite);
+        else if (item.type == ItemType.BoostVitesse)
+        {
+            if (GameManager.Instance != null)
+            {
+                float secondesAjoutees = item.heures * 3600f;
+                DateTime finBonus;
+                
+                if (GameManager.Instance.adBoostTimer > 0) 
+                    finBonus = DateTime.Now.AddSeconds(GameManager.Instance.adBoostTimer).AddSeconds(secondesAjoutees);
+                else 
+                    finBonus = DateTime.Now.AddSeconds(secondesAjoutees);
+
+                GameManager.Instance.adBoostTimer += secondesAjoutees; 
+                GameManager.Instance.adBoostMultiplier = 2.0; 
+
+                PlayerPrefs.SetString("dateFinMultiplicateur", finBonus.ToString());
+                PlayerPrefs.SetInt("multiplicateurArgentActuel", 2);
+                GameManager.Instance.ActualiserTousLesEtages();
+            }
+        }
+
         PlayerPrefs.Save();
+
+        // 3. Son de confirmation
+        if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
+            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
+
+        // 4. On rafraîchit l'inventaire complet (ce qui fera disparaître la case s'il tombe à 0)
+        UpdateUI(); 
     }
 
-    public static void AjouterBoostVitesse(int quantite)
+    // --- POUR LE GACHA ---
+    // Cette fonction universelle remplace les anciennes !
+    public static void AjouterObjet(string idPrefs, int quantite)
     {
-        int current = PlayerPrefs.GetInt("Inv_BoostVitesse", 0);
-        PlayerPrefs.SetInt("Inv_BoostVitesse", current + quantite);
+        int current = PlayerPrefs.GetInt(idPrefs, 0);
+        PlayerPrefs.SetInt(idPrefs, current + quantite);
         PlayerPrefs.Save();
     }
 }

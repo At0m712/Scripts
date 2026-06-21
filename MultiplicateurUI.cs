@@ -51,7 +51,8 @@ public class MultiplicateurUI : MonoBehaviour
     public Color couleurImage3X = new Color(0.1f, 0.5f, 0.8f, 1f); 
     public Color couleurImage4X = new Color(1f, 0.8f, 0f, 1f);     
 
-    private const float TEMPS_MAX_SECONDES = 3600f; 
+    // CORRECTION : On passe la jauge à 4 Heures Max pour permettre de stocker le X4 !
+    private const float TEMPS_MAX_SECONDES = 14400f; 
 
     void Start()
     {
@@ -99,11 +100,13 @@ public class MultiplicateurUI : MonoBehaviour
 
         if (DateTime.TryParse(dateFinString, out finActuelle) && finActuelle > DateTime.Now)
         {
-            PlayerPrefs.SetString("dateFinMultiplicateur", finActuelle.AddHours(1).ToString());
+            finActuelle = finActuelle.AddHours(1);
+            PlayerPrefs.SetString("dateFinMultiplicateur", finActuelle.ToString());
         }
         else
         {
-            PlayerPrefs.SetString("dateFinMultiplicateur", DateTime.Now.AddHours(1).ToString());
+            finActuelle = DateTime.Now.AddHours(1);
+            PlayerPrefs.SetString("dateFinMultiplicateur", finActuelle.ToString());
         }
 
         PlayerPrefs.Save(); 
@@ -111,7 +114,11 @@ public class MultiplicateurUI : MonoBehaviour
         if (GameManager.Instance != null)
         {
             GameManager.Instance.adBoostMultiplier = currentMulti;
-            GameManager.Instance.adBoostTimer += 3600f; 
+            // CORRECTION : On synchronise le timer parfaitement au lieu d'ajouter 3600 aveuglément
+            GameManager.Instance.adBoostTimer = (float)(finActuelle - DateTime.Now).TotalSeconds;
+            
+            // CORRECTION MAJEURE : On force les étages à mettre à jour leur production immédiatement !
+            GameManager.Instance.ActualiserTousLesEtages();
         }
 
         MettreAJourAffichage();
@@ -147,10 +154,10 @@ public class MultiplicateurUI : MonoBehaviour
             }
         }
 
-        // Sécurités sur les textes de temps
         if (timerText != null)
         {
-            timerText.text = isActif ? string.Format("{0:D2}:{1:D2}:{2:D2}", tempsRestant.Hours, tempsRestant.Minutes, tempsRestant.Seconds) : "00:00:00";
+            // Modification pour afficher les heures correctement même s'il y a plus de 1h
+            timerText.text = isActif ? string.Format("{0:D2}:{1:D2}:{2:D2}", (int)tempsRestant.TotalHours, tempsRestant.Minutes, tempsRestant.Seconds) : "00:00:00";
         }
 
         if (barreTempsRouge != null)
@@ -159,12 +166,10 @@ public class MultiplicateurUI : MonoBehaviour
             barreTempsRouge.fillAmount = isActif ? Mathf.Clamp01(ratioTemps) : 0f; 
         }
 
-        // Sécurités sur les images de fond
         if (fond2X != null) fond2X.color = (multi >= 2) ? couleurActif : couleurInactif;
         if (fond3X != null) fond3X.color = (multi >= 3) ? couleurActif : couleurInactif;
         if (fond4X != null) fond4X.color = (multi >= 4) ? couleurActif : couleurInactif;
 
-        // Sécurités sur les textes selon le niveau
         if (multi <= 1) 
         {
             if (titreText != null) titreText.text = "BOOST INACTIF";
@@ -206,7 +211,8 @@ public class MultiplicateurUI : MonoBehaviour
             ActiverVisuels(false, false, false, true); 
             if (imageDynamiqueCouleur != null) imageDynamiqueCouleur.color = couleurImage4X;
             
-            if (tempsRestant.TotalMinutes >= 59.9f)
+            // CORRECTION : On bloque le bouton uniquement s'il a cumulé 4 heures de temps !
+            if (tempsRestant.TotalMinutes >= 239f)
             {
                 if (boutonText != null) boutonText.text = "BOOST MAX";
                 if (descriptionText != null) descriptionText.text = "Tu as atteint le temps maximum !";

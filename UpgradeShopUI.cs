@@ -23,9 +23,7 @@ public class UpgradeShopUI : MonoBehaviour
 
     private double currentCostToBuy; 
     private int levelsToBuy; 
-    
-    // Variables propres à la production
-    private double currentBaseYield; // La production de BASE (sans bonus)
+    private double currentBaseYield; 
     private float currentProductionTime;
     private float timer = 0f;
 
@@ -33,9 +31,11 @@ public class UpgradeShopUI : MonoBehaviour
     {
         if (myFloorData == null) return;
         
-        currentLevel = PlayerPrefs.GetInt("FloorLevel_" + myFloorData.name, 0);
-        timer = PlayerPrefs.GetFloat("FloorTimer_" + myFloorData.name, 0f);
+        // CORRECTION NIVEAU DE DÉPART (Cartes)
+        int minLevels = PlayerPrefs.GetInt("Carte_NiveauxDepart_" + myFloorData.name, 0) * 10;
+        currentLevel = PlayerPrefs.GetInt("FloorLevel_" + myFloorData.name, minLevels);
 
+        timer = PlayerPrefs.GetFloat("FloorTimer_" + myFloorData.name, 0f);
         if (nameText != null) nameText.text = myFloorData.name;
         
         RecalculerStats();
@@ -49,26 +49,16 @@ public class UpgradeShopUI : MonoBehaviour
         {
             float speedMultiplier = 1f;
             if (GameManager.Instance != null && GameManager.Instance.IsRushActive)
-            {
                 speedMultiplier = (float)GameManager.Instance.rushMultiplier;
-            }
 
             timer += Time.deltaTime * speedMultiplier;
 
-            if (jaugeProgression != null)
-            {
-                jaugeProgression.fillAmount = timer / currentProductionTime;
-            }
+            if (jaugeProgression != null) jaugeProgression.fillAmount = timer / currentProductionTime;
 
             if (timer >= currentProductionTime)
             {
                 timer -= currentProductionTime; 
-
-                // On donne EXACTEMENT l'argent défini par la méthode finale, avec 1 seul multiplicateur !
-                if (GameManager.Instance != null)
-                {
-                    GameManager.Instance.AddMana(GetActualYield());
-                }
+                if (GameManager.Instance != null) GameManager.Instance.AddMana(GetActualYield());
             }
         }
         else
@@ -95,10 +85,7 @@ public class UpgradeShopUI : MonoBehaviour
         if (levelsToBuy <= 0) return;
 
         bool isFreeUnlock = (estLePremierEtage && currentLevel == 0);
-        bool canBuy = false;
-
-        if (isFreeUnlock) canBuy = true;
-        else canBuy = GameManager.Instance.SpendMana(currentCostToBuy);
+        bool canBuy = isFreeUnlock ? true : GameManager.Instance.SpendMana(currentCostToBuy);
 
         if (canBuy)
         {
@@ -117,9 +104,25 @@ public class UpgradeShopUI : MonoBehaviour
         }
     }
 
+    // --- NOUVEAU : Récupère le prix de base AVEC la réduction des Cartes Sorciers ---
+    private double GetDiscountedBaseCost()
+    {
+        // Par défaut le bonus est de 1f (pas de réduction). Si on a acheté une carte à 0.90, ça multiplie.
+        float cardDiscount = PlayerPrefs.GetFloat("BonusCost_" + myFloorData.name, 1f); 
+        return myFloorData.baseCost * cardDiscount;
+    }
+
     public void RecalculerStats()
     {
         if (myFloorData == null || GameManager.Instance == null) return;
+
+        // --- LECTURE DES NIVEAUX DE DÉPART (Bonus Cartes) ---
+        int minLevels = PlayerPrefs.GetInt("BonusLevels_" + myFloorData.name, 0);
+        if (currentLevel < minLevels) 
+        {
+            currentLevel = minLevels;
+            PlayerPrefs.SetInt("FloorLevel_" + myFloorData.name, currentLevel);
+        }
 
         double discount = 1f - GameManager.Instance.costReductionBonus;
         double currentMana = GameManager.Instance.manaCurrent;
@@ -138,12 +141,16 @@ public class UpgradeShopUI : MonoBehaviour
         {
             BuyMode mode = BuyModeManager.Instance != null ? BuyModeManager.Instance.currentMode : BuyMode.x1;
             int targetLevelsToAdd = 1;
+            
             if (mode == BuyMode.x1) targetLevelsToAdd = 1;
             else if (mode == BuyMode.x10) targetLevelsToAdd = 10;
             else if (mode == BuyMode.x100) targetLevelsToAdd = 100;
             else if (mode == BuyMode.NEXT) targetLevelsToAdd = ObtenirProchainPalier(currentLevel) - currentLevel;
 
-            if (mode == BuyMode.MAX) CalculateMaxAffordable(currentLevel, currentMana, discount, out levelsToBuy, out currentCostToBuy);
+            if (mode == BuyMode.MAX) 
+            {
+                CalculateMaxAffordable(currentLevel, currentMana, discount, out levelsToBuy, out currentCostToBuy);
+            }
             else
             {
                 CalculateCostForLevels(currentLevel, targetLevelsToAdd, discount, out currentCostToBuy);
@@ -151,13 +158,16 @@ public class UpgradeShopUI : MonoBehaviour
             }
         }
 
-        // --- CALCULE DE BASE EXCLUSIF (Sans les Multiplicateurs Globaux !) ---
         double baseYield = 0;
         float time = myFloorData.baseProductionTime;
 
         if (currentLevel > 0)
         {
-            baseYield = myFloorData.baseProduction * currentLevel * CalculerMultiplicateurPalier(currentLevel);
+            // --- LECTURE DU MULTIPLICATEUR DE PRODUCTION (Bonus Cartes) ---
+            float cardProdMulti = PlayerPrefs.GetFloat("BonusProd_" + myFloorData.name, 1f);
+
+            // On ajoute le bonus de carte au calcul final !
+            baseYield = myFloorData.baseProduction * currentLevel * CalculerMultiplicateurPalier(currentLevel) * cardProdMulti;
 
             int[] paliers = { 25, 50, 75, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 };
             foreach (int palier in paliers)
@@ -175,7 +185,6 @@ public class UpgradeShopUI : MonoBehaviour
         currentBaseYield = baseYield;
         currentProductionTime = time;
 
-        // --- INTERFACE VISUELLE ---
         levelText.text = "Niv. " + currentLevel;
         
         if (isFreeUnlock)
@@ -197,41 +206,35 @@ public class UpgradeShopUI : MonoBehaviour
             if (upgradeButtonText != null) upgradeButtonText.text = "+1";
         }
 
-        // On affiche le chiffre exact (Base * Prestige * Arbre * Pubs)
         double yieldToDisplay = GetActualYield();
 
-        if (currentLevel == 0)
+        if (currentLevel == 0) 
             productionText.text = "0 / sec";
         else
         {
-            if (currentProductionTime <= 1f)
+            if (currentProductionTime <= 1f) 
                 productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / sec";
-            else if (currentProductionTime < 60f)
+            else if (currentProductionTime < 60f) 
                 productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Math.Round(currentProductionTime, 1) + "s";
-            else
+            else 
                 productionText.text = ScoreUI.FormatNumber(yieldToDisplay) + " / " + Math.Round(currentProductionTime / 60f, 1) + "m";
         }
 
         GameManager.Instance.CalculerDPSGlobal();
     }
 
-    // Fonction maîtresse : rassemble la base et les bonus du GameManager UNE SEULE FOIS.
     public double GetActualYield()
     {
         if (GameManager.Instance == null) return currentBaseYield;
         return currentBaseYield * GameManager.Instance.globalMultiplier * GameManager.Instance.adBoostMultiplier;
     }
 
-    // Le DPS utilisé par le GameManager pour afficher en haut de l'écran (Prend en compte le Rush)
     public double ObtenirDPS()
     {
         if (currentProductionTime > 0) 
         {
             double dps = GetActualYield() / currentProductionTime;
-            if (GameManager.Instance != null && GameManager.Instance.IsRushActive)
-            {
-                dps *= GameManager.Instance.rushMultiplier;
-            }
+            if (GameManager.Instance != null && GameManager.Instance.IsRushActive) dps *= GameManager.Instance.rushMultiplier;
             return dps;
         }
         return 0;
@@ -239,7 +242,8 @@ public class UpgradeShopUI : MonoBehaviour
 
     private void CalculateCostForLevels(int startLevel, int levelsToAdd, double discount, out double totalCost)
     {
-        double baseCost = myFloorData.baseCost;
+        // On utilise la nouvelle fonction de prix réduit !
+        double baseCost = GetDiscountedBaseCost();
         double multiplier = myFloorData.costMultiplier;
         
         if (multiplier <= 1.001)
@@ -257,7 +261,8 @@ public class UpgradeShopUI : MonoBehaviour
     {
         affordableLevels = 0;
         totalCost = 0;
-        double baseCost = myFloorData.baseCost;
+        // On utilise la nouvelle fonction de prix réduit !
+        double baseCost = GetDiscountedBaseCost();
         double multiplier = myFloorData.costMultiplier;
 
         if (multiplier <= 1.001)
