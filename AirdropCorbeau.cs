@@ -79,15 +79,16 @@ public class AirdropCorbeau : MonoBehaviour
         // EFFET VISUEL
         if (explosionPlumes != null)
         {
-            // Assure-toi que les particules ne sont pas "Enfant" direct du corbeau, 
-            // sinon elles bougeront avec lui. Le mieux est de les laisser au centre de l'écran.
             explosionPlumes.transform.position = transform.position;
             explosionPlumes.Play();
         }
 
         if (ObjectPooler.Instance != null)
         {
-            GameObject popup = ObjectPooler.Instance.SpawnFromPool(transform.position);
+            // CORRECTION ICI : On donne le Tag (string), la Position (Vector3), et la Rotation (Quaternion.identity = aucune rotation)
+            // ⚠️ ATTENTION : Remplace "PopupText" par le VRAI TAG que tu as configuré dans la liste de ton ObjectPooler !
+            GameObject popup = ObjectPooler.Instance.SpawnFromPool("PopupText", transform.position, Quaternion.identity);
+            
             if (popup != null)
             {
                 TextMeshProUGUI textComp = popup.GetComponentInChildren<TextMeshProUGUI>();
