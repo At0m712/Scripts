@@ -105,6 +105,7 @@ public class GameManager : MonoBehaviour
         }
     }
 
+
     // ==========================================
     // ⚙️ GESTION DES MULTIPLICATEURS ET ARBRE
     // ==========================================
@@ -120,17 +121,21 @@ public class GameManager : MonoBehaviour
         
         // 2. Calcul du Bonus de Production Global (Arbre de compétences)
         int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
+
+        // 3. NOUVEAU : Lecture du Boost Gacha Permanent (Par défaut 1 = pas de boost)
+        float gachaBoost = PlayerPrefs.GetFloat("GachaPermanentBoost", 1f);
         
-        // La formule : Prestige + (Niveau Arbre * 10%)
-        globalMultiplier = prestigeMultiplier + (prodBonusLevel * 0.10); 
+        // La formule GLOBALE : (Prestige + Bonus Arbre) multiplié par la chance du Gacha
+        globalMultiplier = (prestigeMultiplier + (prodBonusLevel * 0.10)) * gachaBoost; 
         
-        // 3. Calcul de la Réduction de Coût (Arbre de compétences)
+        // 4. Calcul de la Réduction de Coût (Arbre de compétences)
         int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
         
-        // La formule : Niveau Arbre * 2% de réduction (max limité pour éviter le gratuit)
+        // La formule : Niveau Arbre * 2% de réduction (max limité à -90% pour éviter le gratuit)
         costReductionBonus = costReducLevel * 0.02f; 
         if (costReductionBonus > 0.90f) costReductionBonus = 0.90f; 
         
+        // 5. Mise à jour des valeurs dans la scène
         CalculerDPSGlobal();
         ActualiserTousLesEtages();
     }

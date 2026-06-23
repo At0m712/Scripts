@@ -28,6 +28,9 @@ public class BoutiqueCartesManager : MonoBehaviour
         // Création des nouvelles cartes
         foreach (CarteDef carte in listeCartes)
         {
+            // 🛡️ LE FILET DE SÉCURITÉ : Si la case est vide dans l'inspecteur, on l'ignore et on passe à la suivante !
+            if (carte == null) continue; 
+
             if (!PlayerPrefs.HasKey("Achete_" + carte.idUnique))
             {
                 GameObject obj = Instantiate(cartePrefab, contentPanel);
