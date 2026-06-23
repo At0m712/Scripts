@@ -28,7 +28,6 @@ public class BoutiqueCartesManager : MonoBehaviour
         // Création des nouvelles cartes
         foreach (CarteDef carte in listeCartes)
         {
-            // 🛡️ LE FILET DE SÉCURITÉ : Si la case est vide dans l'inspecteur, on l'ignore et on passe à la suivante !
             if (carte == null) continue; 
 
             if (!PlayerPrefs.HasKey("Achete_" + carte.idUnique))
@@ -47,17 +46,17 @@ public class BoutiqueCartesManager : MonoBehaviour
             GameManager.Instance.SpendMana(carte.prixMana);
             PlayerPrefs.SetInt("Achete_" + carte.idUnique, 1);
             
-            // Appliquer le bonus selon le type
             AppliquerBonus(carte);
 
-            // CORRECTION : On demande au GameManager de mettre à jour tous les étages
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.ActualiserTousLesEtages();
             }
 
             Destroy(uiObject);
-            PlayerPrefs.Save();
+            
+            if (SaveManager.Instance != null) SaveManager.Instance.DemanderSauvegarde();
+            else PlayerPrefs.Save();
         }
     }
 
@@ -75,7 +74,7 @@ public class BoutiqueCartesManager : MonoBehaviour
             float actuel = PlayerPrefs.GetFloat("BonusCost_" + nomEtage, 1f);
             PlayerPrefs.SetFloat("BonusCost_" + nomEtage, actuel * carte.valeurBonus);
         }
-        else if (carte.typeBonus == TypeBonusCarte.NiveauxDepart)
+        else if (carte.typeBonus == TypeBonusCarte.NiveauDepart) // <-- CORRIGÉ ICI (Singulier)
         {
             int actuel = PlayerPrefs.GetInt("BonusLevels_" + nomEtage, 0);
             PlayerPrefs.SetInt("BonusLevels_" + nomEtage, actuel + (int)carte.valeurBonus);

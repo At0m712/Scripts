@@ -13,10 +13,10 @@ public class CarteSorcierUI : MonoBehaviour
     public Button boutonAchat;
 
     [Header("Localisation des Descriptions")]
-    public LocalizedString texteDescProduction; // Clé ex: Production x{0}
-    public LocalizedString texteDescCout;       // Clé ex: Prix -{0}%
-    public LocalizedString texteDescNiveau;     // Clé ex: Démarre Niv. {0}
-    public LocalizedString textePrixMana;       // Clé ex: {0} Mana
+    public LocalizedString texteDescProduction; 
+    public LocalizedString texteDescCout;       
+    public LocalizedString texteDescNiveau;     
+    public LocalizedString textePrixMana;       
 
     private CarteDef maCarte;
     private BoutiqueCartesManager monManager;
@@ -26,13 +26,11 @@ public class CarteSorcierUI : MonoBehaviour
         maCarte = carte;
         monManager = manager;
 
-        if (iconeObjet != null && carte.icone != null) iconeObjet.sprite = carte.icone;
+        // <-- CORRIGÉ ICI (iconeCarte au lieu de icone)
+        if (iconeObjet != null && carte.iconeCarte != null) iconeObjet.sprite = carte.iconeCarte;
         
-        // Le nom peut rester celui généré car c'est un nom propre
         if (titreText != null) titreText.text = carte.nomCarte;
 
-        // --- MAGIE DE LA LOCALISATION DYNAMIQUE ---
-        // On n'utilise plus la description en dur générée, on la recrée proprement dans la langue du joueur !
         if (descriptionText != null)
         {
             if (carte.typeBonus == TypeBonusCarte.MultiplicateurProduction)
@@ -46,14 +44,13 @@ public class CarteSorcierUI : MonoBehaviour
                 texteDescCout.Arguments = new object[] { pourcentageSoustrait };
                 descriptionText.text = texteDescCout.GetLocalizedString();
             }
-            else if (carte.typeBonus == TypeBonusCarte.NiveauxDepart)
+            else if (carte.typeBonus == TypeBonusCarte.NiveauDepart) // <-- CORRIGÉ ICI (Singulier)
             {
                 texteDescNiveau.Arguments = new object[] { carte.valeurBonus };
                 descriptionText.text = texteDescNiveau.GetLocalizedString();
             }
         }
 
-        // Localisation du prix
         if (prixText != null) 
         {
             textePrixMana.Arguments = new object[] { ScoreUI.FormatNumber(carte.prixMana) };

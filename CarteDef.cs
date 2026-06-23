@@ -4,7 +4,7 @@ public enum TypeBonusCarte
 {
     MultiplicateurProduction,
     ReductionCout,
-    NiveauDepart
+    NiveauDepart // <-- Sans "x" !
 }
 
 [CreateAssetMenu(fileName = "Nouvelle Carte", menuName = "IdleTower/Carte Sorcier")]
@@ -14,10 +14,10 @@ public class CarteDef : ScriptableObject
     public string idUnique; // IMPORTANT : Ne jamais changer une fois créé !
     public string nomCarte;
     [TextArea] public string descriptionCarte;
-    public Sprite iconeCarte;
+    public Sprite iconeCarte; // <-- C'est bien iconeCarte
 
     [Header("Achat")]
-    public int coutCristaux;
+    public double prixMana; // <-- Le fameux prixMana en format double pour supporter les AA, AB...
 
     [Header("Effet de la Carte")]
     public FloorData etageCible; // Si c'est vide, s'applique à tous les étages
