@@ -3,33 +3,51 @@ using TMPro;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.Localization;
-using System.Globalization; // NOUVEAU : Indispensable pour la sécurité des sauvegardes
+using System.Globalization;
+using System.Collections; // Indispensable pour les animations de fondu
 
 public class PrestigeUI : MonoBehaviour
 {
-    [Header("UI Elements")]
+    [Header("UI - Textes")]
+    public TextMeshProUGUI texteExplication;
+    public TextMeshProUGUI texteMultiplicateurActuel;
+    public TextMeshProUGUI texteMultiplicateurFutur;
     public TextMeshProUGUI cristauxGagnesText;
-    public TextMeshProUGUI multiplicateurText;
+
+    [Header("UI - Boutons & Effets")]
     public Button prestigeButton;
+    public Button closeButton;
+    [Tooltip("Une image blanche qui prend tout l'écran, invisible au départ.")]
+    public Image ecranFonduBlanc; 
 
     [Header("Localisation")]
-    public LocalizedString texteGainCristaux; 
-    public LocalizedString texteMultiplicateur; 
-    public LocalizedString texteTropTot; 
+    public LocalizedString locExplication; // Clé ex: Le voyage temporel détruira la tour...
+    public LocalizedString locGainCristaux; // Clé ex: + {0} Cristaux Temporels
+    public LocalizedString locTropTot; // Clé ex: Il faut accumuler plus de Mana !
 
     private int cristauxGagnes;
     private double multiplicateurGagne;
+    private bool isAnimating = false; // Empêche le joueur de spammer le bouton
+
+    void Start()
+    {
+        // On s'assure que l'écran de fondu est bien invisible au lancement
+        if (ecranFonduBlanc != null)
+        {
+            ecranFonduBlanc.gameObject.SetActive(false);
+            ecranFonduBlanc.color = new Color(1f, 1f, 1f, 0f); 
+        }
+    }
 
     void Update()
     {
-        if (GameManager.Instance == null) return;
+        if (GameManager.Instance == null || isAnimating) return;
 
         double totalMana = GameManager.Instance.manaTotalProduced;
-        
+
+        // Calcul mathématique sécurisé pour les nombres immenses
         if (totalMana > 1000000)
         {
-            // 🛡️ CORRECTION MATHÉMATIQUE : Utilisation de System.Math (Double) au lieu de Mathf (Float) 
-            // pour éviter que le jeu ne crashe quand le joueur atteindra des sommes faramineuses (AA, AB...).
             cristauxGagnes = (int)(System.Math.Pow(totalMana / 1000000.0, 0.33));
             multiplicateurGagne = cristauxGagnes * 0.1; 
         }
@@ -39,72 +57,106 @@ public class PrestigeUI : MonoBehaviour
             multiplicateurGagne = 0;
         }
 
+        // --- AFFICHAGE "AVANT / APRÈS" ---
+        double multiActuel = GameManager.Instance.prestigeMultiplier;
+        if (texteMultiplicateurActuel != null) 
+            texteMultiplicateurActuel.text = "Bonus Actuel : x" + multiActuel.ToString("F2");
+
         if (multiplicateurGagne >= 4.0)
         {
             prestigeButton.interactable = true;
-            
-            texteGainCristaux.Arguments = new object[] { ScoreUI.FormatNumber(cristauxGagnes) };
-            if (cristauxGagnesText != null) cristauxGagnesText.text = texteGainCristaux.GetLocalizedString();
 
-            texteMultiplicateur.Arguments = new object[] { multiplicateurGagne.ToString("F2") };
-            if (multiplicateurText != null) multiplicateurText.text = texteMultiplicateur.GetLocalizedString();
+            // On additionne l'actuel et le gagné pour montrer la vraie puissance future
+            double multiFutur = multiActuel + multiplicateurGagne;
+            if (texteMultiplicateurFutur != null) 
+                texteMultiplicateurFutur.text = "Renaissance : <color=#FFD700>x" + multiFutur.ToString("F2") + "</color>";
+
+            locGainCristaux.Arguments = new object[] { ScoreUI.FormatNumber(cristauxGagnes) };
+            if (cristauxGagnesText != null) cristauxGagnesText.text = locGainCristaux.GetLocalizedString();
+            
+            if (texteExplication != null) texteExplication.text = locExplication.GetLocalizedString();
         }
         else
         {
             prestigeButton.interactable = false;
-            if (cristauxGagnesText != null) cristauxGagnesText.text = texteTropTot.GetLocalizedString();
-            if (multiplicateurText != null) multiplicateurText.text = "";
+            
+            if (cristauxGagnesText != null) cristauxGagnesText.text = locTropTot.GetLocalizedString();
+            if (texteMultiplicateurFutur != null) texteMultiplicateurFutur.text = "Renaissance : ???";
+            if (texteExplication != null) texteExplication.text = locExplication.GetLocalizedString();
         }
     }
 
+    // ==========================================
+    // 🌌 LE RITUEL D'ASCENSION (ANIMATION)
+    // ==========================================
     public void ValiderPrestige()
     {
-        if (multiplicateurGagne < 4.0) return;
-
-        // 1. Gain des ressources (Ajout de CultureInfo.InvariantCulture pour éviter les bugs de virgule/point selon les pays)
-        GameManager.Instance.prestigeMultiplier += multiplicateurGagne;
-        GameManager.Instance.temporalCrystals += cristauxGagnes;
-        PlayerPrefs.SetString("prestigeMultiplier", GameManager.Instance.prestigeMultiplier.ToString(CultureInfo.InvariantCulture));
-
-        // 2. Reset du Mana
-        GameManager.Instance.manaCurrent = 0;
-        GameManager.Instance.manaTotalProduced = 0;
-        GameManager.Instance.manaPerSecond = 0;
-
-        // 🛡️ CORRECTION MAJEURE : On a SUPPRIMÉ la boucle qui détruisait les Cartes de la Boutique.
-        // Les cartes Premium et le Gacha Survivent au Prestige !
-
-        // 3. Reset de la progression des étages
-        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
-        foreach (var etage in tousLesEtages)
-        {
-            string nomEtage = etage.myFloorData.name;
-            
-            // On conserve UNIQUEMENT le bonus de niveau de départ offert par les Cartes Sorciers Légendaires
-            int minLevels = PlayerPrefs.GetInt("BonusLevels_" + nomEtage, 0);
-            
-            etage.currentLevel = minLevels;
-            PlayerPrefs.SetInt("FloorLevel_" + nomEtage, minLevels);
-            PlayerPrefs.SetFloat("FloorTimer_" + nomEtage, 0f); 
-            
-            // 🛡️ CORRECTION MAJEURE : On ne supprime plus "BonusProd_" et "BonusCost_", 
-            // sinon les cartes achetées par le joueur perdaient leurs effets !
-        }
-
-        // 4. Sauvegardes finales (Utilisation du SaveManager pour tout sécuriser d'un coup)
-        PlayerPrefs.SetString("manaCurrent", "0");
-        PlayerPrefs.SetString("manaTotalProduced", "0");
-        PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
+        if (multiplicateurGagne < 4.0 || isAnimating) return;
         
-        if (SaveManager.Instance != null) SaveManager.Instance.DemanderSauvegarde();
-        else PlayerPrefs.Save(); // Filet de sécurité
+        // On lance la séquence cinématique
+        StartCoroutine(SequenceAnimationPrestige());
+    }
 
-        // 5. Son et rechargement
+    private IEnumerator SequenceAnimationPrestige()
+    {
+        isAnimating = true;
+
+        // 1. Bloquer l'interface pour empêcher les bugs
+        prestigeButton.interactable = false;
+        if (closeButton != null) closeButton.interactable = false;
+
+        // 2. Jouer un son très lourd/épique si tu as
         if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
         {
             AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
         }
 
+        // 3. Effet de voyage temporel (L'écran devient blanc de plus en plus fort)
+        if (ecranFonduBlanc != null)
+        {
+            ecranFonduBlanc.gameObject.SetActive(true);
+            float timer = 0f;
+            float duration = 1.5f; // Le fondu dure 1.5 secondes
+
+            while (timer < duration)
+            {
+                timer += Time.deltaTime;
+                float alpha = Mathf.Lerp(0f, 1f, timer / duration);
+                ecranFonduBlanc.color = new Color(1f, 1f, 1f, alpha);
+                yield return null;
+            }
+            
+            // Petite pause une fois l'écran 100% blanc pour l'effet dramatique
+            yield return new WaitForSeconds(0.5f); 
+        }
+
+        // 4. LES SAUVEGARDES (Pendant que l'écran est blanc, on efface tout)
+        GameManager.Instance.prestigeMultiplier += multiplicateurGagne;
+        GameManager.Instance.temporalCrystals += cristauxGagnes;
+        PlayerPrefs.SetString("prestigeMultiplier", GameManager.Instance.prestigeMultiplier.ToString(CultureInfo.InvariantCulture));
+
+        GameManager.Instance.manaCurrent = 0;
+        GameManager.Instance.manaTotalProduced = 0;
+        GameManager.Instance.manaPerSecond = 0;
+
+        UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
+        foreach (var etage in tousLesEtages)
+        {
+            string nomEtage = etage.myFloorData.name;
+            int minLevels = PlayerPrefs.GetInt("BonusLevels_" + nomEtage, 0);
+            etage.currentLevel = minLevels;
+            PlayerPrefs.SetInt("FloorLevel_" + nomEtage, minLevels);
+            PlayerPrefs.SetFloat("FloorTimer_" + nomEtage, 0f);
+        }
+
+        PlayerPrefs.SetString("manaCurrent", "0");
+        PlayerPrefs.SetString("manaTotalProduced", "0");
+        PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
+
+        if (SaveManager.Instance != null) SaveManager.Instance.DemanderSauvegarde();
+        else PlayerPrefs.Save();
+
+        // 5. Renaissance (On recharge la scène)
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }
