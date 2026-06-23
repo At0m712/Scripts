@@ -38,6 +38,7 @@ public class GameManager : MonoBehaviour
     {
         ChargerSauvegardeBasique();
         RecalculateMultiplier();
+        CalculerTempsEcoule(); // Restaure les boosts et calcule l'AFK
     }
 
     void Update()
@@ -51,6 +52,47 @@ public class GameManager : MonoBehaviour
                 adBoostTimer = 0;
                 adBoostMultiplier = 1.0;
                 ActualiserTousLesEtages();
+            }
+        }
+    }
+
+    private void CalculerTempsEcoule()
+    {
+        // 1. Restauration des Boosts Vidéo
+        if (PlayerPrefs.HasKey("dateFinMultiplicateur"))
+        {
+            string dateFinStr = PlayerPrefs.GetString("dateFinMultiplicateur");
+            DateTime dateFin;
+            if (DateTime.TryParse(dateFinStr, out dateFin))
+            {
+                if (dateFin > DateTime.Now)
+                {
+                    // Le boost est encore valide !
+                    adBoostTimer = (float)(dateFin - DateTime.Now).TotalSeconds;
+                    adBoostMultiplier = PlayerPrefs.GetInt("multiplicateurArgentActuel", 1);
+                }
+                else
+                {
+                    adBoostTimer = 0f;
+                    adBoostMultiplier = 1.0;
+                }
+            }
+        }
+
+        // 2. Calcul du temps Hors-Ligne pour l'écran de récompense
+        if (PlayerPrefs.HasKey("LastLogoutTime"))
+        {
+            string lastLogoutStr = PlayerPrefs.GetString("LastLogoutTime");
+            DateTime lastLogout;
+            if (DateTime.TryParse(lastLogoutStr, out lastLogout))
+            {
+                TimeSpan tempsEcoule = DateTime.Now - lastLogout;
+                double secondesDeconnecte = tempsEcoule.TotalSeconds;
+
+                if (secondesDeconnecte >= 60 && OfflineGainsManager.Instance != null)
+                {
+                    OfflineGainsManager.Instance.AfficherGainsOffline(secondesDeconnecte);
+                }
             }
         }
     }
@@ -78,13 +120,9 @@ public class GameManager : MonoBehaviour
     // ==========================================
     // 🔄 ACTUALISATION DES ÉTAGES
     // ==========================================
-    
-    // Remplace l'ancien "UpgradeShopUI.AllShops"
     public void CalculerDPSGlobal()
     {
         double newDPS = 0;
-        
-        // On trouve tous les étages actifs dans la scène
         UpgradeShopUI[] tousLesEtages = FindObjectsOfType<UpgradeShopUI>();
         
         foreach (var etage in tousLesEtages)
@@ -105,7 +143,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-
     // ==========================================
     // ⚙️ GESTION DES MULTIPLICATEURS ET ARBRE
     // ==========================================
@@ -122,26 +159,23 @@ public class GameManager : MonoBehaviour
         // 2. Calcul du Bonus de Production Global (Arbre de compétences)
         int prodBonusLevel = PlayerPrefs.GetInt("Arbre_ProdBonus", 0);
 
-        // 3. NOUVEAU : Lecture du Boost Gacha Permanent (Par défaut 1 = pas de boost)
+        // 3. Lecture du Boost Gacha Permanent
         float gachaBoost = PlayerPrefs.GetFloat("GachaPermanentBoost", 1f);
         
-        // La formule GLOBALE : (Prestige + Bonus Arbre) multiplié par la chance du Gacha
+        // Formule globale avec la chance du Gacha intégrée
         globalMultiplier = (prestigeMultiplier + (prodBonusLevel * 0.10)) * gachaBoost; 
         
         // 4. Calcul de la Réduction de Coût (Arbre de compétences)
         int costReducLevel = PlayerPrefs.GetInt("Arbre_CostReduc", 0);
-        
-        // La formule : Niveau Arbre * 2% de réduction (max limité à -90% pour éviter le gratuit)
         costReductionBonus = costReducLevel * 0.02f; 
         if (costReductionBonus > 0.90f) costReductionBonus = 0.90f; 
         
-        // 5. Mise à jour des valeurs dans la scène
         CalculerDPSGlobal();
         ActualiserTousLesEtages();
     }
 
     // ==========================================
-    // 💾 SAUVEGARDE BASIQUE (En soutien du SaveManager)
+    // 💾 SAUVEGARDE BASIQUE
     // ==========================================
     private void ChargerSauvegardeBasique()
     {

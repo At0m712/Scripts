@@ -12,9 +12,23 @@ public class ThemeManager : MonoBehaviour
     public Sprite themeGlace;
     public Sprite themeNeant;
 
+    private int derniersCristaux = -1;
+
     void Start()
     {
         UpdateTheme();
+    }
+
+    void Update()
+    {
+        if (GameManager.Instance == null) return;
+
+        // OPTIMISATION : On ne met à jour le fond QUE si le nombre de cristaux vient de changer
+        if (GameManager.Instance.temporalCrystals != derniersCristaux)
+        {
+            derniersCristaux = GameManager.Instance.temporalCrystals;
+            UpdateTheme();
+        }
     }
 
     public void UpdateTheme()

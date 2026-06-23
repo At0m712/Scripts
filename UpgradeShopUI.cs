@@ -108,6 +108,9 @@ public class UpgradeShopUI : MonoBehaviour
         else upgradeButton.interactable = (levelsToBuy > 0 && GameManager.Instance.manaCurrent >= currentCostToBuy);
     }
 
+    // ==========================================
+    // 🛒 ACHAT DE NIVEAU
+    // ==========================================
     public void AcheterNiveau()
     {
         if (levelsToBuy <= 0) return;
@@ -120,6 +123,10 @@ public class UpgradeShopUI : MonoBehaviour
             currentLevel += levelsToBuy;
             PlayerPrefs.SetInt("FloorLevel_" + myFloorData.name, currentLevel);
             RecalculerStats();
+
+            // 🛡️ SÉCURITÉ DE SAUVEGARDE AJOUTÉE :
+            // On prévient le gestionnaire qu'il faudra sauvegarder la prochaine fois qu'il fait sa ronde
+            if (SaveManager.Instance != null) SaveManager.Instance.DemanderSauvegarde();
 
             if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
                 AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);

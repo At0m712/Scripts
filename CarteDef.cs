@@ -1,29 +1,28 @@
 using UnityEngine;
 
-// La liste des types de bonus possibles pour tes cartes
 public enum TypeBonusCarte
 {
     MultiplicateurProduction,
     ReductionCout,
-    NiveauxDepart
+    NiveauDepart
 }
 
-// Permet de créer les cartes facilement via un Clic Droit > IdleTower > Carte Sorcier dans tes dossiers
 [CreateAssetMenu(fileName = "Nouvelle Carte", menuName = "IdleTower/Carte Sorcier")]
 public class CarteDef : ScriptableObject
 {
-    [Header("Informations Générales")]
-    public string idUnique = "carte_001"; // Doit être unique pour la sauvegarde (ex: "baguette_apprenti")
-    public string nomCarte = "Nom de la carte";
-    public Sprite icone;
-    
-    [Header("Prix")]
-    public double prixMana = 1000;
+    [Header("Infos de la Carte")]
+    public string idUnique; // IMPORTANT : Ne jamais changer une fois créé !
+    public string nomCarte;
+    [TextArea] public string descriptionCarte;
+    public Sprite iconeCarte;
+
+    [Header("Achat")]
+    public int coutCristaux;
 
     [Header("Effet de la Carte")]
-    public FloorData etageCible; // L'étage affecté par la carte
+    public FloorData etageCible; // Si c'est vide, s'applique à tous les étages
     public TypeBonusCarte typeBonus;
     
-    [Tooltip("Ex: 2 pour Production x2. 0.1 pour Coût -10%. 5 pour +5 Niveaux de départ.")]
+    [Tooltip("EXEMPLES IMPORTANTS :\n- Mettre 2 pour une Production x2.\n- Mettre 0.9 pour une réduction de Coût de -10%.\n- Mettre 5 pour +5 Niveaux de départ.")]
     public float valeurBonus = 2f; 
 }

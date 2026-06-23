@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 
 public class SaveManager : MonoBehaviour
 {
@@ -14,11 +15,10 @@ public class SaveManager : MonoBehaviour
 
     void Start()
     {
-        // OPTIMISATION MAX : Sauvegarde groupée toutes les 10 secondes au lieu de chaque frame ou chaque achat
+        // OPTIMISATION MAX : Sauvegarde groupée toutes les 10 secondes au lieu de chaque frame
         InvokeRepeating(nameof(ForcerSauvegarde), 10f, 10f);
     }
 
-    // À appeler par les autres scripts (ex: GameManager) au lieu de PlayerPrefs.Save()
     public void DemanderSauvegarde()
     {
         aDesModificationsNonSauvegardees = true;
@@ -33,12 +33,13 @@ public class SaveManager : MonoBehaviour
         }
     }
 
-    // ESSENTIEL SUR MOBILE : Sauvegarde si le joueur met l'application en arrière-plan (Home button, appel reçu...)
+    // ESSENTIEL SUR MOBILE : Sauvegarde si le joueur met l'application en arrière-plan
     void OnApplicationPause(bool pauseStatus)
     {
         if (pauseStatus) 
         {
             PlayerPrefs.Save();
+            SauvegarderTempsDeconnexion();
             aDesModificationsNonSauvegardees = false;
         }
     }
@@ -47,6 +48,14 @@ public class SaveManager : MonoBehaviour
     void OnApplicationQuit()
     {
         PlayerPrefs.Save();
+        SauvegarderTempsDeconnexion();
         aDesModificationsNonSauvegardees = false;
+    }
+
+    private void SauvegarderTempsDeconnexion()
+    {
+        // On sauvegarde l'heure exacte à laquelle le jeu est mis en pause/fermé
+        PlayerPrefs.SetString("LastLogoutTime", DateTime.Now.ToString());
+        PlayerPrefs.Save();
     }
 }

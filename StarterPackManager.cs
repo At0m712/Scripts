@@ -3,53 +3,55 @@ using UnityEngine.UI;
 
 public class StarterPackManager : MonoBehaviour
 {
-    [Header("UI Pack de Démarrage")]
-    public GameObject starterPackButton; // Le bouton HUD avec animation PulseGlow
+    [Header("UI")]
+    public Button starterPackButton;
     public int levelRequiredToShow = 10;
 
-    void Start()
+    private void Start()
     {
-        CheckStarterPackVisibility();
+        VerifierAchat();
     }
 
-    public void CheckStarterPackVisibility()
+    private void VerifierAchat()
     {
-        // Si le pack a déjà été acheté, on le cache définitivement
-        if (PlayerPrefs.GetInt("StarterPackBought", 0) == 1)
+        // Si le pack a déjà été acheté, on cache le bouton définitivement
+        if (PlayerPrefs.GetInt("StarterPackAchete", 0) == 1)
         {
-            starterPackButton.SetActive(false);
-            return;
-        }
-
-        // On vérifie le niveau de l'étage 1 (Apprenti Sorcier)
-        int currentLevel = PlayerPrefs.GetInt("Tour_Apprenti Sorcier", 0);
-        
-        if (currentLevel >= levelRequiredToShow)
-        {
-            starterPackButton.SetActive(true);
+            if (starterPackButton != null) starterPackButton.gameObject.SetActive(false);
         }
         else
         {
-            starterPackButton.SetActive(false);
+            if (starterPackButton != null) starterPackButton.gameObject.SetActive(true);
         }
     }
 
-    // À lier au bouton d'achat en argent réel (Via Unity IAP)
+    // ==========================================
+    // 💳 SUCCÈS DE L'ACHAT (À lier à ton IAP Button)
+    // ==========================================
     public void BuyStarterPackSuccessful()
     {
-        // Récompense massive pour fidéliser le joueur
-        GameManager.Instance.temporalCrystals += 50; 
-        GameManager.Instance.AddMana(GameManager.Instance.manaPerSecond * 3600 * 24); // +24h de mana
-        
-        PlayerPrefs.SetInt("StarterPackBought", 1);
-        PlayerPrefs.Save();
-        
-        starterPackButton.SetActive(false);
+        if (GameManager.Instance == null) return;
 
-        // JUS VISUEL
-        if (AudioManager.Instance != null && AudioManager.Instance.cashSound != null)
-        {
-            AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.cashSound);
-        }
+        // 1. Gain des Cristaux
+        GameManager.Instance.temporalCrystals += 50; 
+        PlayerPrefs.SetInt("temporalCrystals", GameManager.Instance.temporalCrystals);
+
+        // 2. Gain du Mana (24h de production, ou 50 000 minimum)
+        double dpsActuel = GameManager.Instance.manaPerSecond;
+        
+        // 🛡️ SÉCURITÉ : Évite le bug du gain = 0 si le joueur achète le pack dès la première seconde
+        double manaGagne = (dpsActuel > 0) ? dpsActuel * 86400 : 50000; // 86400 = 24 heures en secondes
+        
+        GameManager.Instance.AddMana(manaGagne); 
+
+        // 3. Enregistrement définitif de l'achat
+        PlayerPrefs.SetInt("StarterPackAchete", 1);
+        PlayerPrefs.Save();
+
+        // 4. On cache le bouton
+        if (starterPackButton != null) starterPackButton.gameObject.SetActive(false);
+
+        // 5. On demande la sauvegarde générale
+        if (SaveManager.Instance != null) SaveManager.Instance.DemanderSauvegarde();
     }
 }
