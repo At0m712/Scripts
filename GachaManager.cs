@@ -13,8 +13,8 @@ public class GachaManager : MonoBehaviour
     public TextMeshProUGUI texteDropRates;
 
     [Header("UI - Bouton Unique")]
-    public Button boutonActionPub; // LE bouton unique
-    public TextMeshProUGUI texteBoutonAction; // Le texte à l'intérieur du bouton
+    public Button boutonActionPub; 
+    public TextMeshProUGUI texteBoutonAction; 
     public Button boutonFermer;
 
     [Header("Animation - Éléments de la Scène")]
@@ -72,90 +72,40 @@ public class GachaManager : MonoBehaviour
         {
             if (boutonFermer != null) boutonFermer.interactable = true;
 
-            // LE BOUTON INTELLIGENT
             if (boutonActionPub != null)
             {
+                boutonActionPub.interactable = (tiragesRestants > 0);
+                
                 if (niveauActuel < 5)
                 {
-                    boutonActionPub.interactable = true;
-                    if (texteBoutonAction != null) texteBoutonAction.text = "Améliorer\n(Pub)";
+                    if (texteBoutonAction != null) texteBoutonAction.text = "Invoquer & Améliorer\n(Pub)";
                 }
                 else
                 {
-                    boutonActionPub.interactable = (tiragesRestants > 0);
                     if (texteBoutonAction != null) texteBoutonAction.text = "Invoquer\n(Pub)";
                 }
             }
         }
     }
 
-    // ==========================================
-    // 📺 CLIC SUR LE BOUTON UNIQUE
-    // ==========================================
     public void OnClickBoutonAction()
     {
-        if (isAnimating) return;
-        if (niveauActuel >= 5 && tiragesRestants <= 0) return;
+        if (isAnimating || tiragesRestants <= 0) return;
 
         // C'EST ICI QUE TU LANCERAS TA PUB ADMOB PLUS TARD.
-        // Exemple : AdMobManager.Instance.ShowRewardedAd(OnPubTerminee);
-        
-        // Pour l'instant, on simule que la pub a été vue avec succès :
         OnPubTerminee();
     }
 
-    // Fonction appelée QUAND LA PUB EST FINIE
     public void OnPubTerminee()
     {
-        if (niveauActuel < 5)
-        {
-            StartCoroutine(SequenceAmelioration());
-        }
-        else
-        {
-            tiragesRestants--;
-            PlayerPrefs.SetInt("GachaTirages", tiragesRestants);
-            PlayerPrefs.Save();
-            StartCoroutine(SequenceTirageGacha());
-        }
-    }
-
-    // ==========================================
-    // 🎬 ANIMATION 1 : AMÉLIORATION MACHINE
-    // ==========================================
-    private IEnumerator SequenceAmelioration()
-    {
-        isAnimating = true;
-        VerrouillerInterface();
-        texteRecompenseObtenue.text = "Amélioration en cours...";
-        zoneAnimationCapsule.SetActive(false);
-
-        // Tremblement
-        Vector3 positionInitiale = machineConteneur.transform.localPosition;
-        float tempsTremblement = 0f;
-        while (tempsTremblement < 1f)
-        {
-            machineConteneur.transform.localPosition = positionInitiale + (Vector3)UnityEngine.Random.insideUnitCircle * 10f;
-            tempsTremblement += Time.deltaTime;
-            yield return null;
-        }
-        machineConteneur.transform.localPosition = positionInitiale; 
-
-        yield return new WaitForSeconds(0.2f);
-
-        // Gain du niveau
-        niveauActuel++;
-        PlayerPrefs.SetInt("GachaLevel", niveauActuel);
+        tiragesRestants--;
+        PlayerPrefs.SetInt("GachaTirages", tiragesRestants);
         PlayerPrefs.Save();
-
-        texteRecompenseObtenue.text = "Machine améliorée au Niveau " + niveauActuel + " !";
         
-        TerminerAnimation();
+        // On lance TOUJOURS le tirage (qui gérera l'amélioration de la machine en même temps)
+        StartCoroutine(SequenceTirageGacha());
     }
 
-    // ==========================================
-    // 🎬 ANIMATION 2 : LE VRAI GACHA
-    // ==========================================
     private IEnumerator SequenceTirageGacha()
     {
         isAnimating = true;
@@ -176,10 +126,18 @@ public class GachaManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.2f);
 
-        // Tirage des %
+        // 🛡️ CORRECTION : Si la machine n'est pas niveau 5, on l'améliore ICI, sans bloquer la récompense !
+        if (niveauActuel < 5)
+        {
+            niveauActuel++;
+            PlayerPrefs.SetInt("GachaLevel", niveauActuel);
+            PlayerPrefs.Save();
+        }
+
+        // Tirage de la récompense
         EffectuerTirage();
 
-        // Apparition de la capsule (Pop)
+        // Pop
         zoneAnimationCapsule.SetActive(true);
         zoneAnimationCapsule.transform.localScale = Vector3.zero; 
         
@@ -192,20 +150,15 @@ public class GachaManager : MonoBehaviour
             yield return null;
         }
 
-        TerminerAnimation();
+        isAnimating = false;
+        if (boutonActionPub != null) boutonActionPub.gameObject.SetActive(true);
+        MettreAJourUI();
     }
 
     private void VerrouillerInterface()
     {
         if (boutonActionPub != null) boutonActionPub.gameObject.SetActive(false);
         if (boutonFermer != null) boutonFermer.interactable = false;
-    }
-
-    private void TerminerAnimation()
-    {
-        isAnimating = false;
-        if (boutonActionPub != null) boutonActionPub.gameObject.SetActive(true);
-        MettreAJourUI();
     }
 
     // ==========================================
@@ -236,19 +189,22 @@ public class GachaManager : MonoBehaviour
         if(iconeRecompense != null) iconeRecompense.sprite = imageCristaux;
     }
 
+    // 🛡️ CORRECTION INVENTAIRE
     private void DonnerPotion()
     {
-        float secondes = 1800f; 
-        if (niveauActuel == 2) secondes = 3600f; 
-        else if (niveauActuel == 3) secondes = 7200f; 
-        else if (niveauActuel == 4) secondes = UnityEngine.Random.Range(7200f, 18000f); 
-        else if (niveauActuel == 5) secondes = UnityEngine.Random.Range(18000f, 36000f); 
+        string idPotion = "potion_1h";
+        string nomPotion = "Potion 1H";
 
-        double gainMana = GameManager.Instance.manaPerSecond * secondes;
-        GameManager.Instance.AddMana(gainMana);
+        if (niveauActuel == 1) { idPotion = "potion_1h"; nomPotion = "Potion 1H"; }
+        else if (niveauActuel == 2) { idPotion = "potion_2h"; nomPotion = "Potion 2H"; }
+        else if (niveauActuel == 3) { idPotion = "potion_4h"; nomPotion = "Potion 4H"; }
+        else if (niveauActuel == 4) { idPotion = "potion_8h"; nomPotion = "Potion 8H"; }
+        else if (niveauActuel == 5) { idPotion = "potion_12h"; nomPotion = "Potion 12H"; }
+
+        // Ajout propre dans le système d'inventaire
+        InventaireUI.AjouterObjet(idPotion, 1);
         
-        int heuresFormatees = Mathf.RoundToInt(secondes / 3600f);
-        texteRecompenseObtenue.text = "Potion " + heuresFormatees + "H !";
+        texteRecompenseObtenue.text = nomPotion + "\n(Ajoutée à l'Inventaire) !";
         if(iconeRecompense != null) iconeRecompense.sprite = imagePotion;
     }
 

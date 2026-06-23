@@ -4,7 +4,7 @@ using UnityEngine.UI;
 using UnityEngine.SceneManagement;
 using UnityEngine.Localization;
 using System.Globalization;
-using System.Collections; // Indispensable pour les animations de fondu
+using System.Collections; 
 
 public class PrestigeUI : MonoBehaviour
 {
@@ -21,17 +21,16 @@ public class PrestigeUI : MonoBehaviour
     public Image ecranFonduBlanc; 
 
     [Header("Localisation")]
-    public LocalizedString locExplication; // Clé ex: Le voyage temporel détruira la tour...
-    public LocalizedString locGainCristaux; // Clé ex: + {0} Cristaux Temporels
-    public LocalizedString locTropTot; // Clé ex: Il faut accumuler plus de Mana !
+    public LocalizedString locExplication; 
+    public LocalizedString locGainCristaux; 
+    public LocalizedString locTropTot; 
 
     private int cristauxGagnes;
     private double multiplicateurGagne;
-    private bool isAnimating = false; // Empêche le joueur de spammer le bouton
+    private bool isAnimating = false; 
 
     void Start()
     {
-        // On s'assure que l'écran de fondu est bien invisible au lancement
         if (ecranFonduBlanc != null)
         {
             ecranFonduBlanc.gameObject.SetActive(false);
@@ -45,7 +44,6 @@ public class PrestigeUI : MonoBehaviour
 
         double totalMana = GameManager.Instance.manaTotalProduced;
 
-        // Calcul mathématique sécurisé pour les nombres immenses
         if (totalMana > 1000000)
         {
             cristauxGagnes = (int)(System.Math.Pow(totalMana / 1000000.0, 0.33));
@@ -57,16 +55,15 @@ public class PrestigeUI : MonoBehaviour
             multiplicateurGagne = 0;
         }
 
-        // --- AFFICHAGE "AVANT / APRÈS" ---
         double multiActuel = GameManager.Instance.prestigeMultiplier;
         if (texteMultiplicateurActuel != null) 
             texteMultiplicateurActuel.text = "Bonus Actuel : x" + multiActuel.ToString("F2");
 
-        if (multiplicateurGagne >= 4.0)
+        // 🛡️ CORRECTION : On débloque le prestige dès 0.5 (Environ 130 Millions de Mana généré)
+        if (multiplicateurGagne >= 0.1) 
         {
             prestigeButton.interactable = true;
 
-            // On additionne l'actuel et le gagné pour montrer la vraie puissance future
             double multiFutur = multiActuel + multiplicateurGagne;
             if (texteMultiplicateurFutur != null) 
                 texteMultiplicateurFutur.text = "Renaissance : <color=#FFD700>x" + multiFutur.ToString("F2") + "</color>";
@@ -86,14 +83,11 @@ public class PrestigeUI : MonoBehaviour
         }
     }
 
-    // ==========================================
-    // 🌌 LE RITUEL D'ASCENSION (ANIMATION)
-    // ==========================================
     public void ValiderPrestige()
     {
-        if (multiplicateurGagne < 4.0 || isAnimating) return;
+        // 🛡️ CORRECTION : Autorisé dès 0.5
+        if (multiplicateurGagne < 0.5 || isAnimating) return; 
         
-        // On lance la séquence cinématique
         StartCoroutine(SequenceAnimationPrestige());
     }
 
@@ -101,22 +95,19 @@ public class PrestigeUI : MonoBehaviour
     {
         isAnimating = true;
 
-        // 1. Bloquer l'interface pour empêcher les bugs
         prestigeButton.interactable = false;
         if (closeButton != null) closeButton.interactable = false;
 
-        // 2. Jouer un son très lourd/épique si tu as
         if (AudioManager.Instance != null && AudioManager.Instance.buySound != null)
         {
             AudioManager.Instance.sfxSource.PlayOneShot(AudioManager.Instance.buySound);
         }
 
-        // 3. Effet de voyage temporel (L'écran devient blanc de plus en plus fort)
         if (ecranFonduBlanc != null)
         {
             ecranFonduBlanc.gameObject.SetActive(true);
             float timer = 0f;
-            float duration = 1.5f; // Le fondu dure 1.5 secondes
+            float duration = 1.5f; 
 
             while (timer < duration)
             {
@@ -126,11 +117,9 @@ public class PrestigeUI : MonoBehaviour
                 yield return null;
             }
             
-            // Petite pause une fois l'écran 100% blanc pour l'effet dramatique
             yield return new WaitForSeconds(0.5f); 
         }
 
-        // 4. LES SAUVEGARDES (Pendant que l'écran est blanc, on efface tout)
         GameManager.Instance.prestigeMultiplier += multiplicateurGagne;
         GameManager.Instance.temporalCrystals += cristauxGagnes;
         PlayerPrefs.SetString("prestigeMultiplier", GameManager.Instance.prestigeMultiplier.ToString(CultureInfo.InvariantCulture));
@@ -156,7 +145,6 @@ public class PrestigeUI : MonoBehaviour
         if (SaveManager.Instance != null) SaveManager.Instance.DemanderSauvegarde();
         else PlayerPrefs.Save();
 
-        // 5. Renaissance (On recharge la scène)
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
     }
 }
