@@ -21,6 +21,13 @@ public class GachaManager : MonoBehaviour
     public GameObject machineConteneur; 
     public GameObject zoneAnimationCapsule; 
     public Image iconeRecompense; 
+
+    [Header("Animation - Détails Capsule")]
+    public GameObject capsuleFermee;
+    public GameObject capsuleOuverteHaut;
+    public GameObject capsuleOuverteBas;
+    public GameObject effetLumiereVFX;
+    public float hauteurOuverture = 150f; // De combien de pixels le haut de la capsule monte
     
     [Header("Sprites")]
     public Sprite imagePotion;
@@ -33,13 +40,28 @@ public class GachaManager : MonoBehaviour
     private const int MAX_TIRAGES = 15;
     private bool isAnimating = false; 
 
+    // Mémoire de la position initiale pour ne pas que la capsule s'envole à l'infini entre 2 tirages
+    private Vector3 positionInitialeCapsuleHaut;
+
     void Start()
     {
         ChargerSauvegardes();
         VerifierResetQuotidien();
         MettreAJourUI();
         
-        if(zoneAnimationCapsule != null) zoneAnimationCapsule.SetActive(false);
+        if (zoneAnimationCapsule != null) zoneAnimationCapsule.SetActive(false);
+        
+        // On mémorise la position de base du "chapeau" de la capsule
+        if (capsuleOuverteHaut != null) positionInitialeCapsuleHaut = capsuleOuverteHaut.transform.localPosition;
+    }
+
+    void Update()
+    {
+        // Fait tourner l'effet de lumière sur lui-même en continu quand il est affiché
+        if (effetLumiereVFX != null && effetLumiereVFX.activeSelf)
+        {
+            effetLumiereVFX.transform.Rotate(0f, 0f, -100f * Time.deltaTime);
+        }
     }
 
     private void ChargerSauvegardes()
@@ -102,18 +124,33 @@ public class GachaManager : MonoBehaviour
         PlayerPrefs.SetInt("GachaTirages", tiragesRestants);
         PlayerPrefs.Save();
         
-        // On lance TOUJOURS le tirage (qui gérera l'amélioration de la machine en même temps)
         StartCoroutine(SequenceTirageGacha());
     }
 
+    // ==========================================
+    // 🎬 ANIMATION CINÉMATOGRAPHIQUE
+    // ==========================================
     private IEnumerator SequenceTirageGacha()
     {
         isAnimating = true;
         VerrouillerInterface();
         texteRecompenseObtenue.text = "Invocation en cours...";
-        zoneAnimationCapsule.SetActive(false);
 
-        // Tremblement
+        // --- PRÉPARATION : On cache et réinitialise tout ---
+        zoneAnimationCapsule.SetActive(false);
+        if(capsuleFermee != null) capsuleFermee.SetActive(true);
+        if(capsuleOuverteHaut != null) 
+        {
+            capsuleOuverteHaut.SetActive(false);
+            capsuleOuverteHaut.transform.localPosition = positionInitialeCapsuleHaut;
+        }
+        if(capsuleOuverteBas != null) capsuleOuverteBas.SetActive(false);
+        if(effetLumiereVFX != null) effetLumiereVFX.SetActive(false);
+        
+        iconeRecompense.transform.localScale = Vector3.zero; 
+        texteRecompenseObtenue.gameObject.SetActive(false);
+
+        // --- ÉTAPE 1 : Tremblement de la machine ---
         Vector3 positionInitiale = machineConteneur.transform.localPosition;
         float tempsTremblement = 0f;
         while (tempsTremblement < 1f)
@@ -126,7 +163,7 @@ public class GachaManager : MonoBehaviour
 
         yield return new WaitForSeconds(0.2f);
 
-        // 🛡️ CORRECTION : Si la machine n'est pas niveau 5, on l'améliore ICI, sans bloquer la récompense !
+        // Amélioration de la machine si besoin
         if (niveauActuel < 5)
         {
             niveauActuel++;
@@ -134,10 +171,10 @@ public class GachaManager : MonoBehaviour
             PlayerPrefs.Save();
         }
 
-        // Tirage de la récompense
+        // On détermine mathématiquement ce que le joueur gagne
         EffectuerTirage();
 
-        // Pop
+        // --- ÉTAPE 2 : La capsule fermée s'approche (Grossit) ---
         zoneAnimationCapsule.SetActive(true);
         zoneAnimationCapsule.transform.localScale = Vector3.zero; 
         
@@ -150,6 +187,39 @@ public class GachaManager : MonoBehaviour
             yield return null;
         }
 
+        yield return new WaitForSeconds(0.2f); // Petite pause de suspense
+
+        // --- ÉTAPE 3 : La capsule s'ouvre ---
+        if(capsuleFermee != null) capsuleFermee.SetActive(false);
+        if(capsuleOuverteHaut != null) capsuleOuverteHaut.SetActive(true);
+        if(capsuleOuverteBas != null) capsuleOuverteBas.SetActive(true);
+
+        Vector3 cibleHaut = positionInitialeCapsuleHaut + new Vector3(0f, hauteurOuverture, 0f);
+
+        float tempsOuverture = 0f;
+        while (tempsOuverture < 0.3f)
+        {
+            tempsOuverture += Time.deltaTime;
+            if(capsuleOuverteHaut != null)
+                capsuleOuverteHaut.transform.localPosition = Vector3.Lerp(positionInitialeCapsuleHaut, cibleHaut, tempsOuverture / 0.3f);
+            yield return null;
+        }
+
+        // --- ÉTAPE 4 : Apparition de la récompense et du VFX ---
+        if(effetLumiereVFX != null) effetLumiereVFX.SetActive(true);
+        texteRecompenseObtenue.gameObject.SetActive(true);
+
+        float tempsRecompense = 0f;
+        while (tempsRecompense < 0.4f)
+        {
+            tempsRecompense += Time.deltaTime;
+            // On utilise un effet "Overshoot" mathématique pour que l'icône rebondisse légèrement (facultatif mais cool)
+            float scale = Mathf.Lerp(0f, 1f, tempsRecompense / 0.4f); 
+            iconeRecompense.transform.localScale = new Vector3(scale, scale, 1f);
+            yield return null;
+        }
+
+        // --- FIN DE L'ANIMATION ---
         isAnimating = false;
         if (boutonActionPub != null) boutonActionPub.gameObject.SetActive(true);
         MettreAJourUI();
@@ -189,7 +259,6 @@ public class GachaManager : MonoBehaviour
         if(iconeRecompense != null) iconeRecompense.sprite = imageCristaux;
     }
 
-    // 🛡️ CORRECTION INVENTAIRE
     private void DonnerPotion()
     {
         string idPotion = "potion_1h";
@@ -201,7 +270,6 @@ public class GachaManager : MonoBehaviour
         else if (niveauActuel == 4) { idPotion = "potion_8h"; nomPotion = "Potion 8H"; }
         else if (niveauActuel == 5) { idPotion = "potion_12h"; nomPotion = "Potion 12H"; }
 
-        // Ajout propre dans le système d'inventaire
         InventaireUI.AjouterObjet(idPotion, 1);
         
         texteRecompenseObtenue.text = nomPotion + "\n(Ajoutée à l'Inventaire) !";
